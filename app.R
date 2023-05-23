@@ -95,13 +95,18 @@ server <- function(input, output) {
   reactive_date <- reactive({
     input$date
   })
-  
+
   inventory_init <- eventReactive(input$brapipull, {
-    as.data.frame(brapi::ba_studies_table(con = brap, studyDbId = 	"3654"))
-    
+    as.data.frame(brapi::ba_studies_table(con = brap, studyDbId = "3654")) %>% 
+      filter(observationLevel=="plant") %>% #select just plant rows
+      #select(c("germplasmName")) %>%
+      count(germplasmName) #select just germplasm Name
+      
   })
-  
- 
+
+  output$inventoryTable<-({renderDataTable(inventory_init())})
+
+
   }
 
 shinyApp(ui, server)
