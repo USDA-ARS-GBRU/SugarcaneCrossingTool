@@ -48,14 +48,16 @@ ui <- dashboardPage(
       tabItem(
         tabName="home",
         p(
-          "Welcome to STract, the Sugarcane crossing tool! Choose a date from the calendar on the left
-          .Then click 'Get Data' to pull in data from", a(href = "https://sugarcanebase.breedinginsight.net/", "SugarcaneBase"), ".")
+          "Welcome to STract, the Sugarcane crossing tool! Choose a date from the calendar on the left.
+          Then click 'Get Data' to pull in data from", a(href = "https://sugarcanebase.breedinginsight.net/", "SugarcaneBase"), ".")
       ),
       
       # First tab content
       tabItem(
         tabName = "flowering",
-        fluidRow(box(dataTableOutput("inventoryTable")))
+        fluidRow(
+          box(p("The table to the right is a count of each clone that is flowering on the date you selected"), width=4),
+          box(dataTableOutput("inventoryTable")))
       ),
 
       # Second tab content
@@ -99,8 +101,9 @@ server <- function(input, output) {
   inventory_init <- eventReactive(input$brapipull, {
     as.data.frame(brapi::ba_studies_table(con = brap, studyDbId = "3654")) %>% 
       filter(observationLevel=="plant") %>% #select just plant rows
-      #select(c("germplasmName")) %>%
+      ## add row to filter on reactive data!
       count(germplasmName) #select just germplasm Name
+    
       
   })
 
