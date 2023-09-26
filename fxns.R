@@ -259,3 +259,114 @@ gp2tbl <- function(res, type = '1') {
   return(df)
 }
 
+
+ba_seedlots_details <- function(con = NULL,
+                                 
+                                pageSize=1000,
+                                page=0,
+                                 rclass = c("tibble", "data.frame",
+                                            "list", "json")) {
+  # ba_check(con = con, verbose = FALSE, brapi_calls = "germplasm/id")
+  # check_character(germplasmDbId)
+  # check_req(germplasmDbId)
+  rclass <- match.arg(rclass)
+  
+  callurl <- get_brapi(con = con) %>% paste0("seedlots?page=",page,"&pageSize=", pageSize)
+  
+  try({
+    resp <- brapiGET(url = callurl, con = con)
+    cont <- httr::content(x = resp, as = "text", encoding = "UTF-8")
+    out <- NULL
+    if (rclass %in% c("json", "list")) {
+      out <- dat2tbl(res = cont, rclass = rclass)
+    }
+    if (rclass == "data.frame") {
+      out <- gp2tbl(cont)
+    }
+    if (rclass == "tibble") {
+      out <- gp2tbl(cont) %>% tibble::as_tibble(validate = FALSE)
+    }
+    class(out) <- c(class(out), "ba_germplasm_details")
+    
+    show_metadata(resp)
+    return(out)
+  })
+}
+
+
+ba_check <- function(con = NULL, verbose = TRUE, brapi_calls = "any") {
+  stopifnot(is.ba_con(con))
+  stopifnot(is.logical(verbose))
+  stopifnot(is.character(brapi_calls))
+  
+  url <- con$db
+  
+  ba_can_internet()
+  ba_can_internet(url)
+  
+  if (verbose) {
+    ba_message("BrAPI connection ok.")
+    ba_message(paste(con, collapse = "\n"))
+  }
+  return(TRUE)
+}
+
+is.ba_con <- function(obj) {
+  res <- "ba_con" %in% class(obj)
+  return(res)
+}
+
+ba_can_internet <- function(url = "www.google.org") {
+  stopifnot(is.character(url))
+  return(invisible(curl::nslookup(host = url)))
+}
+
+dat2tbl <- function(res, rclass = "tibble", brapi_class = "ba", result_level = "data") {
+  if (rclass == "json") {
+    return(jsonlite::prettify(txt = res))
+  }
+  lst <- jsonlite::fromJSON(txt = res)
+  if(result_level == "data") {
+    dat <- jsonlite::toJSON(x = lst$result$data)
+  }
+  if(result_level == "result"){
+    dat <- jsonlite::toJSON(x = lst$result)
+  }
+  if(result_level == "progeny"){
+    dat <- jsonlite::toJSON(x = lst$result$progeny)
+    germplasmDbId <- lst$result$germplasmDbId
+    defaultDisplayName <- lst$result$defaultDisplayName
+    np <- max(length(lst$result$progeny), 1)
+    dat1 <- as.data.frame(cbind(germplasmDbId = rep(germplasmDbId, np),
+                                defaultDisplayName = rep(defaultDisplayName, np)))
+    
+    
+  }
+  
+  if (rclass == "list") {
+    return(jsonlite::fromJSON(txt = res, simplifyVector = FALSE))
+  }
+  if (rclass == "vector") {
+    return(jsonlite::fromJSON(txt = dat, simplifyVector = TRUE))
+  }
+  if (rclass == "data.frame") {
+    res <- jsonlite::fromJSON(txt = dat,
+                              simplifyDataFrame = TRUE) %>% as.data.frame
+  }
+  if (rclass == "tibble") {
+    res <- jsonlite::fromJSON(txt = dat, simplifyDataFrame = TRUE,
+                              flatten = TRUE)
+    res <- tibble::as_tibble(x = res)
+  }
+  if(result_level == "progeny") {
+    if(nrow(res) > 0) {
+      names(res) <- paste0("progeny.", names(res))
+      res <- cbind(dat1, res)
+    } else {
+      res <- dat1
+    }
+  }
+  attr(x = res, which = "metadata") <- lst$metadata
+  class(res) <- c(class(res), brapi_class)
+  return(res)
+}

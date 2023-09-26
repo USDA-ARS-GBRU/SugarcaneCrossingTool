@@ -14,6 +14,7 @@ library(reshape2)
 library(AGHmatrix)
 library(heatmaply)
 library(shinyWidgets)
+library(data.table)
 
 
 ## CUSTOM DATA and FUNCTION LOAD -----------
@@ -99,8 +100,8 @@ ui <- dashboardPage(
                tabName = "performance",
                icon = icon("star")),
       
-      menuItem("Inventory",
-               tabName = "inventory",
+      menuItem("Crosses",
+               tabName = "crosses",
                icon = icon("envelope"))
     )
   ),
@@ -188,14 +189,25 @@ ui <- dashboardPage(
       ),
 
 
-      ### Fourth tab content ----
+      ### Crosses tab content ----
       tabItem(
-        tabName = "inventory",
-        h2("Table of available seedlots")
+        tabName = "crosses",
+        fluidRow(
+          column(width=5,
+          box(actionButton(inputId = "makecrosses",
+                           label = "Get Cross Data"),
+              p("The table to the right is a count of crosses that have been made with the clones that are flowering on the 
+                date you selected"))),
+          
+          box(DTOutput("crossesTable")))
+        
+        
       )
     )
   )
 )
+
+
 
 
 # SERVER ---------------------------------------
@@ -249,8 +261,9 @@ server <- function(input, output) {
     # }
     
     
-    tmp<-ba_germplasm_details2(con=brap2, germplasmQuery=as.character("?studyDbId=3654&pageSize=1000"), rclass="data.frame")
+    tmp<-ba_germplasm_details2(con=brap2, germplasmQuery=as.character(paste0("?studyDbId=",studydbid,"&pageSize=1000")), rclass="data.frame")
      #hacked ba_germplasm_details2 to get details for the entire study, then filtered with code below
+    #oh, could have used ba_germplasm_details_study.... oh well
     
     pedigree<-tmp[tmp$data.germplasmName%in%germplasm$germplasmName,c("data.germplasmName", "data.germplasmDbId","data.pedigree")]
     
@@ -354,7 +367,33 @@ server <- function(input, output) {
   output$performanceTable<-({renderDT(datasetInput(), extensions = "FixedColumns", options = list(
     scrollX = TRUE, fixedColumns = list(leftColumns = 2)))})
 
+## Crosses ----
+  
+  #still need way to pull in new crosses? <- leave off here:
+  
+crosses_init<- eventReactive(input$makecrosses, withProgress(message="Pulling Cross Data", {{
 
+
+  germplasm<-as.data.frame(inventory_init())
+
+  freq_crosses<-as.data.frame(table(historical_crosses$Female.Parent, historical_crosses$Male.Parent))
+  freq_crosses<-freq_crosses[-which(freq_crosses$Freq==0),] #get rid of crosses never made
+  colnames(freq_crosses)<-c("Female.Parent", "Male.Parent", "Number.of.Crosses")
+
+  progeny_crosses<-as.data.frame(aggregate(Number.of.Progenies~Female.Parent+Male.Parent,FUN=sum, data=historical_crosses))
+  new_dataset <- freq_crosses %>% right_join(progeny_crosses, by=c("Female.Parent","Male.Parent"))
+
+  ##change to AND for production!!!!!
+  new_dataset2<-new_dataset[which(new_dataset$Female.Parent%in%germplasm$germplasmName&
+                                    new_dataset$Male.Parent%in%germplasm$germplasmName),] #do or for testing....
+
+  new_dataset2
+}}))
+
+  output$crossesTable<-({renderDT(crosses_init(), extensions = "FixedColumns", options = list(
+    scrollX = TRUE, fixedColumns = list(leftColumns = 3)))})
+  
+  
   }
 
 shinyApp(ui, server)
