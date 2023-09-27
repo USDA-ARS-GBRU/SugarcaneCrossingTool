@@ -293,6 +293,42 @@ ba_seedlots_details <- function(con = NULL,
   })
 }
 
+ba_crosses_study <- function(con = NULL,
+                                crossingProjectDbId="",
+                                
+                                pageSize=1000,
+                                page=0,
+                                rclass = c("tibble", "data.frame",
+                                           "list", "json")) {
+  # ba_check(con = con, verbose = FALSE, brapi_calls = "germplasm/id")
+  # check_character(germplasmDbId)
+  # check_req(germplasmDbId)
+  rclass <- match.arg(rclass)
+  
+  callurl <- get_brapi(con = con) %>% paste0("crosses?crossingProjectDbId=", crossingProjectDbId,
+                                             "&page=",page,"&pageSize=", pageSize)
+  
+  try({
+    resp <- brapiGET(url = callurl, con = con)
+    cont <- httr::content(x = resp, as = "text", encoding = "UTF-8")
+    out <- NULL
+    if (rclass %in% c("json", "list")) {
+      out <- dat2tbl(res = cont, rclass = rclass)
+    }
+    if (rclass == "data.frame") {
+      out <- gp2tbl(cont)
+    }
+    if (rclass == "tibble") {
+      out <- gp2tbl(cont) %>% tibble::as_tibble(validate = FALSE)
+    }
+    class(out) <- c(class(out), "ba_germplasm_details")
+    
+    show_metadata(resp)
+    return(out)
+  })
+}
+
+
 
 ba_check <- function(con = NULL, verbose = TRUE, brapi_calls = "any") {
   stopifnot(is.ba_con(con))
@@ -369,4 +405,73 @@ dat2tbl <- function(res, rclass = "tibble", brapi_class = "ba", result_level = "
   attr(x = res, which = "metadata") <- lst$metadata
   class(res) <- c(class(res), brapi_class)
   return(res)
+}
+
+
+init_cross_table<-function(cross_list, Female.Parent='Female.Parent', Male.Parent="Male.Parent", new_crosses=F){
+ 
+   if(dim(cross_list)[2]==1){ #if cross list is empty (first day)
+    return(NULL)
+  }
+  
+  #new_crosses means that there won't be any progenies because the cross was made this year
+  freq_crosses<-as.data.frame(table(cross_list[,Female.Parent], cross_list[,Male.Parent]))
+  freq_crosses<-freq_crosses[-which(freq_crosses$Freq==0),] #get rid of crosses never made
+  colnames(freq_crosses)<-c("Female.Parent", "Male.Parent", "Number.of.Crosses")
+  
+  if(new_crosses==F){
+  progeny_crosses<-as.data.frame(aggregate(Number.of.Progenies~Female.Parent+Male.Parent,FUN=sum, data=cross_list))
+  crosses_table <- freq_crosses %>% right_join(progeny_crosses, by=c("Female.Parent","Male.Parent"))
+  
+  return(crosses_table)
+  } else {
+  
+  freq_crosses$Number.of.Progenies<-"None, new cross"
+  crosses_table<-freq_crosses
+  return(crosses_table)
+  }
+  
+}
+
+get_endpoint <- function(pointbase, ...) {
+  forbidden <- "[/?&]$"
+  pointbase <- sub(forbidden, "", pointbase)
+  args <- list(...)
+  
+  if (all(c("pageSize", "page") %in% names(args))) {
+    check_paging(args$pageSize, args$page)
+  }
+  if ("pageSize" %in% names(args)) {
+    args$pageSize <- ifelse(args$pageSize == 1000, "", args$pageSize)
+  }
+  if ("page" %in% names(args)) {
+    args$page <- ifelse(args$page == 0, "", args$page)
+  }
+  
+  p <- list()
+  j <- 1
+  
+  for (i in seq_along(args)) {
+    if (nchar(names(args)[[i]]) == 0) stop("All parameters must have a name.")
+    if (is.logical(args[[i]])) args[[i]] <- tolower(args[[i]])
+    if (length(args[[i]]) == 1) {
+      if (is.na(args[[i]])) args[[i]] <- ""
+      
+      if (args[[i]] == "any") next()
+      if (args[[i]] == 0) next()
+    }
+    
+    if (!is.null(args[[i]]) && args[[i]] != "") {
+      args[[i]] <- sub(forbidden, "", args[[i]])
+      
+      p[[j]] <- paste0(names(args)[[i]], "=", paste(args[[i]], collapse = ","))
+      j <- j + 1
+    }
+  }
+  url <- gsub(pattern = " ",
+              replacement = "%20",
+              x = paste0(pointbase, "?", paste(p, collapse = "&")))
+  return(sub(pattern = forbidden,
+             replacement = "",
+             x = url))
 }

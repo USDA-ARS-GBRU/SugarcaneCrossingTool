@@ -1,10 +1,10 @@
 
 ## read in data (replace with your file path)
 pedigree_download<-read.csv("crossingdemo_fullped.csv") #needs to be updated each year
+historical_crosses<-read.csv("cross_entries_2023-09-26.csv")
 
 studydbid<-"3654" #needs to be updated each year
-
-historical_crosses<-read.csv("cross_entries_2023-09-26.csv")
+crossingprojectdbid<-"291" #needs to be updated every year
 
 
 #run once

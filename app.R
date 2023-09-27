@@ -15,7 +15,7 @@ library(AGHmatrix)
 library(heatmaply)
 library(shinyWidgets)
 library(data.table)
-
+library(writexl)
 
 ## CUSTOM DATA and FUNCTION LOAD -----------
 
@@ -94,7 +94,7 @@ ui <- dashboardPage(
       
       menuItem("Kinship", 
                tabName = "kinship", 
-               icon = icon("xmark")),
+               icon = icon("people-group")),
       
       menuItem("Performance", 
                tabName = "performance",
@@ -102,7 +102,11 @@ ui <- dashboardPage(
       
       menuItem("Crosses",
                tabName = "crosses",
-               icon = icon("envelope"))
+               icon = icon("xmark")),
+      
+      menuItem("Download",
+               tabName="download",
+               icon=icon("download"))
     )
   ),
   
@@ -131,9 +135,13 @@ ui <- dashboardPage(
         
         p("3. Next, you can click on any of the other tabs to see their associated data"),
         
-        h4("Note, this tool is currently pointing to: "),
+        h4("Note, this tool is currently pointing to these canlines: "),
         
-        textOutput("inventoryPointer")
+        textOutput("inventoryPointer"),
+        
+        h4("Note, this tool is currently pointing to this crossing experiment: "),
+        
+        textOutput("crossPointer")
         
       ),
       
@@ -200,9 +208,17 @@ ui <- dashboardPage(
                 date you selected"))),
           
           box(DTOutput("crossesTable")))
+       
         
         
-      )
+      ),
+  
+      tabItem(
+        tabName="download",
+        fluidRow(
+          downloadButton("test", "Test")
+        )
+      ) 
     )
   )
 )
@@ -221,9 +237,11 @@ server <- function(input, output) {
   
   #point to current study
   output$inventoryPointer<-renderText(unique(brapi::ba_studies_table(con = brap, studyDbId = studydbid)$studyName))
+  
+  output$crossPointer<-renderText(unique(ba_crosses_study(con=brap2, crossingProjectDbId = crossingprojectdbid, rclass="data.frame")$data.crossingProjectName[[1]]))
 
   
-  
+
 ## Flowering  ------
   
   inventory_init <- eventReactive(input$brapipull, withProgress(message="Pulling Inventory Data", {{
@@ -369,29 +387,46 @@ server <- function(input, output) {
 
 ## Crosses ----
   
-  #still need way to pull in new crosses? <- leave off here:
+ 
   
 crosses_init<- eventReactive(input$makecrosses, withProgress(message="Pulling Cross Data", {{
 
+  ### for filtering
+  germplasm<<-as.data.frame(inventory_init())
 
-  germplasm<-as.data.frame(inventory_init())
+  ### get 
+  historical_cross_table<-init_cross_table(cross_list=historical_crosses)
+  
+  historical_cross_table2<-historical_cross_table[which(historical_cross_table$Female.Parent%in%germplasm$germplasmName&
+                                                          historical_cross_table$Male.Parent%in%germplasm$germplasmName),]
+  
 
-  freq_crosses<-as.data.frame(table(historical_crosses$Female.Parent, historical_crosses$Male.Parent))
-  freq_crosses<-freq_crosses[-which(freq_crosses$Freq==0),] #get rid of crosses never made
-  colnames(freq_crosses)<-c("Female.Parent", "Male.Parent", "Number.of.Crosses")
+  new_crosses_table<-init_cross_table(cross_list=ba_crosses_study(con=brap2, crossingProjectDbId = crossingprojectdbid, rclass="data.frame"),
+                                      Female.Parent = "data.parent1.germplasmName", Male.Parent = "data.parent2.germplasmName", new_crosses = T)
+  
+  new_crosses_table2<-new_crosses_table[which(new_crosses_table$Female.Parent%in%germplasm$germplasmName&
+                                                          new_crosses_table$Male.Parent%in%germplasm$germplasmName),]
+  
+  all_cross_table<-rbind(historical_cross_table2, new_crosses_table2)
+  
+  rownames(all_cross_table)<-NULL
+                       
+  all_cross_table               
 
-  progeny_crosses<-as.data.frame(aggregate(Number.of.Progenies~Female.Parent+Male.Parent,FUN=sum, data=historical_crosses))
-  new_dataset <- freq_crosses %>% right_join(progeny_crosses, by=c("Female.Parent","Male.Parent"))
-
-  ##change to AND for production!!!!!
-  new_dataset2<-new_dataset[which(new_dataset$Female.Parent%in%germplasm$germplasmName&
-                                    new_dataset$Male.Parent%in%germplasm$germplasmName),] #do or for testing....
-
-  new_dataset2
+  
 }}))
 
   output$crossesTable<-({renderDT(crosses_init(), extensions = "FixedColumns", options = list(
     scrollX = TRUE, fixedColumns = list(leftColumns = 3)))})
+  
+  
+  output$test<-downloadHandler(filename=function() {"test.xlsx"},
+                               content=function(file) {write_xlsx(crosses_init(), path=file)})
+  
+  
+  ####Download page
+  
+  
   
   
   }
@@ -400,42 +435,3 @@ shinyApp(ui, server)
 
 
 
-
-# # Define UI for application that draws a histogram
-# ui <- fluidPage(
-#
-#     # Application title
-#     titlePanel("Old Faithful Geyser Data"),
-#
-#     # Sidebar with a slider input for number of bins
-#     sidebarLayout(
-#         sidebarPanel(
-#             sliderInput("bins",
-#                         "Number of bins:",
-#                         min = 1,
-#                         max = 50,
-#                         value = 30)
-#         ),
-#
-#         # Show a plot of the generated distribution
-#         mainPanel(
-#            plotOutput("distPlot")
-#         )
-#     )
-# )
-#
-# # Define server logic required to draw a histogram
-# server <- function(input, output) {
-#
-#     output$distPlot <- renderPlot({
-#         # generate bins based on input$bins from ui.R
-#         x    <- faithful[, 2]
-#         bins <- seq(min(x), max(x), length.out = input$bins + 1)
-#
-#         # draw the histogram with the specified number of bins
-#         hist(x, breaks = bins, col = 'darkgray', border = 'white')
-#     })
-# }
-#
-# # Run the application
-# shinyApp(ui = ui, server = server)
