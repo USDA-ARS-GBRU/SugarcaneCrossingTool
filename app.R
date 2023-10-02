@@ -26,25 +26,6 @@ source("demotrials_configs.R")
 
 ## THEME
 
-# create_theme(
-#   theme = "flatly",
-#   bs_vars_color(
-#     brand_primary = "#75b8d1",
-#     brand_success = "#c9d175",
-#     brand_info = "#758bd1",
-#     brand_warning = "#d1ab75",
-#     brand_danger = "#d175b8"
-#   ),
-#   bs_vars_navbar(
-#     default_bg = "#75b8d1",
-#     default_color = "#FFFFFF",
-#     default_link_color = "#FFFFFF",
-#     default_link_active_color = "#FFFFFF"
-#   ),
-#   output_file = "./www/custom-theme.css"
-# )
-
-
 
 ## INIT DB CONNECTION ----------------------
 
@@ -99,7 +80,7 @@ ui <- dashboardPage(
 
   
   ## HEADER --------
-  header=dashboardHeader(title = "STract"),
+  header=dashboardHeader(title = "STracT"),
 
   ## SIDEBAR ------
   sidebar=dashboardSidebar(
@@ -153,7 +134,7 @@ ui <- dashboardPage(
       tabItem(
         tabName = "home",
         h1("USDA Sugarcane Crossing Tool"),
-        p("Welcome to STract, the Sugarcane crossing tool! This tool lets you 
+        p("Welcome to STracT, the Sugarcane crossing tool! This tool lets you 
            see data and generate reports for all of the 
           clones that are flowering on a specific day."),
         h4("Here are instructions on how to use this tool."),
@@ -286,11 +267,11 @@ server <- function(input, output) {
   separate(col = "Tassel.Count", into = c("Tassel.Count", "Timestamp"), sep = ",", remove = FALSE) %>%
   separate(col = "Timestamp", into = c("Timestamp", NA), sep = " ", remove = TRUE) %>%
   filter(Timestamp == reactive_date()) %>%
-  select(germplasmName, germplasmDbId) %>%
-  group_by(germplasmName, germplasmDbId) %>%
+  select(germplasmName, germplasmDbId, Sex..M.F.WM) %>%
+  group_by(germplasmName, germplasmDbId,Sex..M.F.WM ) %>%
   summarise(count = n()) %>%
   add_column(Number.Used = 0) %>% # select just germplasm Name
-  rename(Clone = germplasmName, Flowering.Count = count) }}))
+  rename(Clone = germplasmName, Flowering.Count = count, Sex=Sex..M.F.WM) }}))
 
   output$inventoryTable<-({renderDT(inventory_init()[,-which(colnames(inven)=="germplasmDbId")], options=list(language = list(
     zeroRecords = "There are no records to display. Double check the date you selected and try again. 
