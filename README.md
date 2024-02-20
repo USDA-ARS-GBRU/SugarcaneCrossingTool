@@ -14,4 +14,8 @@ USER="yourbreedbaseusername"
 
 PASSWORD="yourbreedbasepassword"
 
+**IID for testing is '3642'**
+
+**CID for testing is '219'**
+
 
