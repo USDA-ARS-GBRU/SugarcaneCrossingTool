@@ -27,7 +27,7 @@ source("app_configs.R")
 ## THEME
 
 ## CHECK if true connection
-brapi::ba_check(brap) # true
+brapi::ba_check(brap) # should be true, for debugging
 
 # USER INTERFACE  -------------------------------------------------------------
 
@@ -47,6 +47,10 @@ ui <- dashboardPage(
 
   ## SIDEBAR ------
   sidebar = dashboardSidebar(
+    
+    textInput("inventoryid", "Login with your IID:", value=""),
+    textInput("crossesid", "Login with your CID:", value=""),
+    
     dateInput(
       "date",
       "Choose A Date:"
@@ -106,10 +110,15 @@ ui <- dashboardPage(
         ),
         p("3. Next, you can click on any of the other tabs to see their associated data"),
         p("4. You can also download a report using the 'Download' tab."),
-        h4("Note, this tool is inventoring these can lines: "),
+        h4("Note, you've logged in to view inventory for these can lines: "),
         textOutput("inventoryPointer"),
-        h4("Note, this tool is tracking this crossing experiment: "),
-        textOutput("crossPointer")
+        
+        h4("Note, you've logged in to track this crossing experiment: "),
+        textOutput("crossPointer"),
+        
+        # h4("Note, you're getting inventory for this date:"),
+        # textOutput("datePointer")
+        
       ),
 
       ### Flowering tab content -----
@@ -213,16 +222,33 @@ server <- function(input, output) {
     input$date
   })
 
-  # output$date<-renderText(reactive_date())
+  reactive_iid<-reactive({input$inventoryid})
+  
+  reactive_cid<-reactive({input$crossesid})
+  
+  #output$datePointer<-renderText(input$date)
 
   # point to current study
-  output$inventoryPointer <- renderText(unique(brapi::ba_studies_table(con = brap, studyDbId = studydbid)$studyName))
+  
+  output$inventoryPointer <- renderText({
+   validate(
+     need(input$inventoryid != "", "Please log in with your IID")
+   )
+   unique(brapi::ba_studies_table(con = brap, studyDbId = as.character(input$inventoryid))$studyName)
+ })
 
-  output$crossPointer <- renderText(unique(ba_crosses_study(con = brap2, crossingProjectDbId = crossingprojectdbid, rclass = "data.frame")$data.crossingProjectName[[1]]))
+ output$crossPointer <- renderText({
+   validate(
+     need(input$crossesid != "", "Please log in with your CID")
+   )
+   unique(ba_crosses_study(con = brap2, crossingProjectDbId = as.character(input$crossesid), rclass = "data.frame")$data.crossingProjectName[[1]])
+ })
 
+  
+  
   ## Flowering  ------
 
-  inventory_init <- eventReactive(input$brapipull, withProgress(message = "Pulling Inventory Data", {{ inven <- data.frame(brapi::ba_studies_table(con = brap, studyDbId = studydbid, rclass="data.frame")) %>%
+  inventory_init <- eventReactive(input$brapipull, withProgress(message = "Pulling Inventory Data", {{ inven <- data.frame(brapi::ba_studies_table(con = brap, studyDbId = reactive_iid(), rclass="data.frame")) %>%
     filter(observationLevel == "plant") %>% # select just plant rows
      #separate(col = "Tassel.Count", into = c("Tassel.Count", "Timestamp"), sep = ",", remove = FALSE) %>% #old
      #separate(col = "Timestamp", into = c("Timestamp", NA), sep = " ", remove = TRUE) %>% #old 
@@ -252,7 +278,7 @@ server <- function(input, output) {
     
     tmp <- stripClass(
       as.data.frame(
-        ba_germplasm_details2(con = brap2, germplasmQuery = as.character(paste0("?studyDbId=", studydbid, "&pageSize=1000")), rclass = "data.frame")
+        ba_germplasm_details2(con = brap2, germplasmQuery = as.character(paste0("?studyDbId=", reactive_iid(), "&pageSize=1000")), rclass = "data.frame")
       ),
       classString = "ba_germplasm_details"
     )
@@ -322,6 +348,16 @@ server <- function(input, output) {
     }
 
     tmp2 <- bind_rows(tmp2)
+    
+    #extract stage information from study name
+    tmp2$Advanced<-str_extract(tmp2$studyName, "S3|S4|Stage 2|OUTFIELD|INFIELD|NURSERY")
+    
+    #aggregate just by germplasm name
+    s<-aggregate(Advanced~germplasmName, unique, data=tmp2)
+      #remove quotes and parentheses from output 
+    s$Advanced<-gsub("c\\(|\\)","", s$Advanced)
+    s$Advanced<-noquote(gsub('"', "", s$Advanced)) #why this works only in two steps, I do not know
+    
 
     v <- aggregate(as.numeric(observations.value) ~ observations.observationVariableName + germplasmName, mean, data = tmp2, na.action = na.omit)
     colnames(v)[3] <- "observations.value"
@@ -339,7 +375,7 @@ server <- function(input, output) {
     z <- rbind(v, w, x)
 
     y <- reshape2::dcast(z, germplasmName ~ observations.observationVariableName)
-    y <-y %>%  rename(Clone = germplasmName) }}))
+    s <-s %>% right_join(y) %>%  rename(Clone = germplasmName)}}))
 
   output$colSelect <- renderUI({
     pickerInput(
@@ -379,7 +415,7 @@ server <- function(input, output) {
 
 
     new_crosses_table <- InitCrossTable(
-      cross_list = ba_crosses_study(con = brap2, crossingProjectDbId = crossingprojectdbid, rclass = "data.frame"),
+      cross_list = ba_crosses_study(con = brap2, crossingProjectDbId = reactive_cid(), rclass = "data.frame"),
       Female.Parent = "data.parent1.germplasmName", Male.Parent = "data.parent2.germplasmName", new_crosses = T
     )
 
