@@ -8,7 +8,7 @@ https://keocorak.shinyapps.io/STract/
 cd /path/to/working directory
 touch .Renviron
 
-**Add the following lines to the .Renviron file:**
+**Add the following _2_ lines to the .Renviron file:**
 
 USER="yourbreedbaseusername"
 
