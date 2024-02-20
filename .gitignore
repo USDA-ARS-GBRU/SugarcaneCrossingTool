@@ -5,3 +5,4 @@
 testdata/
 .Renviron
 .sass_cache_keys
+.DS_Store
