@@ -10,7 +10,7 @@ touch .Renviron
 
 **Add the following lines to the .Renviron file:**
 
-USER="yourbreedbaseusername"
+USER="yourbreedbaseusername" \n
 PASSWORD="yourbreedbasepassword"
 
 
