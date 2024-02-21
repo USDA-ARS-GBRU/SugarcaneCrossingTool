@@ -25,6 +25,7 @@ source("app_functions.R")
 source("app_configs.R")
 
 ## THEME
+#TBA
 
 ## CHECK if true connection
 brapi::ba_check(brap) # should be true, for debugging
@@ -43,7 +44,7 @@ ui <- dashboardPage(
 
 
   ## HEADER --------
-  header = dashboardHeader(title = "STracT"),
+  header = dashboardHeader(title = "Sugarcane Crossing Tool"),
 
   ## SIDEBAR ------
   sidebar = dashboardSidebar(
@@ -333,11 +334,14 @@ server <- function(input, output) {
   ## Performance ----
   performance_init <- eventReactive(input$makeperformance, withProgress(message = "Pulling Performance Data", {{ germplasm <- as.data.frame(inventory_init())
   germplasm<-germplasm[duplicated(germplasm$Clone)==FALSE,]
-    tmp <- list()
+    
+  #pull phenotype data for each item in inventory table ('germplasm')
+  tmp <- list()
     for (i in 1:dim(germplasm)[1]) {
       tmp[[i]] <- brapi::ba_phenotypes_search(con = brap, germplasmDbId = as.character(germplasm[i, 2]), rclass = "data.frame", observationLevel = "plot", pageSize = 20000)
     }
 
+  #if item does not have any phenotype data, remove it from the list
     tmp2 <- list()
     j <- 1
     for (i in 1:length(tmp)) {
@@ -347,36 +351,46 @@ server <- function(input, output) {
       }
     }
 
+    #bind all list elements together into one table
     tmp2 <- bind_rows(tmp2)
     
-    #extract stage information from study name
+    #extract stage information from study name (Needs to be updated)
     tmp2$Advanced<-str_extract(tmp2$studyName, "S3|S4|Stage 2|OUTFIELD|INFIELD|NURSERY")
     
-    #aggregate just by germplasm name
+    #aggregate 'Advanced' data by germplasm name - (function= print unique terms)
     s<-aggregate(Advanced~germplasmName, unique, data=tmp2)
-      #remove quotes and parentheses from output 
+      
+    #clean up -- remove quotes and parentheses from output 
     s$Advanced<-gsub("c\\(|\\)","", s$Advanced)
     s$Advanced<-noquote(gsub('"', "", s$Advanced)) #why this works only in two steps, I do not know
     
-
+    #aggregate (function=mean) all other phenotypic data by germplasm name, 
     v <- aggregate(as.numeric(observations.value) ~ observations.observationVariableName + germplasmName, mean, data = tmp2, na.action = na.omit)
     colnames(v)[3] <- "observations.value"
     v$observations.value <- round(as.numeric(v$observations.value), 2)
     v$observations.observationVariableName <- paste0(v$observations.observationVariableName, " mean")
 
+    
+    #aggregate (function=standard deviation) all other phenotypic data by germplasm name, 
     w <- aggregate(observations.value ~ observations.observationVariableName + germplasmName, sd, data = tmp2, na.action = na.omit)
     w$observations.value <- round(as.numeric(w$observations.value), 2)
     w$observations.observationVariableName <- paste0(w$observations.observationVariableName, " sd")
 
+    #aggregate (function=count of observations) all other phenotypic data by germplasm name, 
     x <- aggregate(observations.value ~ observations.observationVariableName + germplasmName, length, data = tmp2, na.action = na.omit)
     x$observations.value <- round(as.numeric(x$observations.value), 2)
     x$observations.observationVariableName <- paste0(x$observations.observationVariableName, " count")
 
+    #bind all numeric data together
     z <- rbind(v, w, x)
 
+    #reshape
     y <- reshape2::dcast(z, germplasmName ~ observations.observationVariableName)
+   
+    #join with Advanced data
     s <-s %>% right_join(y) %>%  rename(Clone = germplasmName)}}))
 
+  #the rest of this is the column picker
   output$colSelect <- renderUI({
     pickerInput(
       inputId = "phenoPick",
