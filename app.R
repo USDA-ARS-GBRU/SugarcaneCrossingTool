@@ -25,6 +25,7 @@ source("app_functions.R")
 source("app_configs.R")
 
 ## THEME
+#TBA
 
 ## CHECK if true connection
 brapi::ba_check(brap) # should be true, for debugging
@@ -43,7 +44,7 @@ ui <- dashboardPage(
 
 
   ## HEADER --------
-  header = dashboardHeader(title = "STracT"),
+  header = dashboardHeader(title = "Sugarcane Crossing Tool"),
 
   ## SIDEBAR ------
   sidebar = dashboardSidebar(
@@ -55,6 +56,9 @@ ui <- dashboardPage(
       "date",
       "Choose A Date:"
     ),
+    
+    p("for testing, select:", strong("October 10, 2023")),
+    
     actionButton(
       "brapipull",
       "Get Flower Inventory Data"
@@ -158,26 +162,41 @@ ui <- dashboardPage(
         )
       ),
 
-      ### Performance tab content ----
+     ### Performance tab content ----
       tabItem(
         tabName = "performance",
-        fluidRow(
-            box(
-              actionButton(
-                inputId = "makeperformance",
-                label = "Get Performance Data"
-              ),
-              p("This table shows the mean and sd of the peformance for each clone 
-              that is flowering on the date you selected. Once data has been pulled from the database, you will be able to select traits to view using the drop-down menu. This step may take several minutes, please be patient."),
-
-              # stuff for what phenotype to select
-              uiOutput(outputId = "colSelect"), # render html list output
-              actionButton("selectCol", "View Selected Data")
-            )
+        tabsetPanel(
+          type = "tabs",
+          tabPanel(
+            "Performance Table",
+            fluidRow(
+              box(
+                actionButton(
+                  inputId = "makeperformance",
+                  label = "Get Performance Data"
+                ),
+                p("This table shows the mean and sd of the performance for each clone 
+                  that is flowering on the date you selected. Once data has been pulled from the database, you will be able to select traits to view using the drop-down menu. This step may take several minutes, please be patient."),
+                # stuff for what phenotype to select
+                uiOutput(outputId = "colSelect"), # render html list output
+                actionButton("selectCol", "View Selected Data")
+              )
+            ),
+            DTOutput("performanceTable")
           ),
-          DTOutput("performanceTable")
+          tabPanel(
+            "Trait Scatter Plot",
+            fluidRow(
+              box(
+                selectInput("xAxis", "Select X-Axis:", choices = NULL),
+                selectInput("yAxis", "Select Y-Axis:", choices = NULL),  
+                plotlyOutput("traitScatterPlot")
+              )
+            )
+          )
         )
-      ,
+      ),
+    
 
 
       ### Crosses tab content ----
@@ -214,12 +233,30 @@ ui <- dashboardPage(
 )
 
 
+
+
+
+
+
+
+
+
+
 # SERVER ---------------------------------------
 
 server <- function(input, output) {
   # choose date
   reactive_date <- reactive({
     input$date
+  })
+
+ 
+
+  output$traitScatterPlot <- renderPlotly({
+    if (!is.null(input$xAxis) && !is.null(input$yAxis)) {
+      plot_ly(data = performance_data(), x = ~get(input$xAxis), y = ~get(input$yAxis), type = 'scatter', mode = 'markers') %>%
+        layout(title = "Trait Scatter Plot", xaxis = list(title = input$xAxis), yaxis = list(title = input$yAxis))
+    }
   })
 
   reactive_iid<-reactive({input$inventoryid})
@@ -250,16 +287,12 @@ server <- function(input, output) {
 
   inventory_init <- eventReactive(input$brapipull, withProgress(message = "Pulling Inventory Data", {{ inven <- data.frame(brapi::ba_studies_table(con = brap, studyDbId = reactive_iid(), rclass="data.frame")) %>%
     filter(observationLevel == "plant") %>% # select just plant rows
-     #separate(col = "Tassel.Count", into = c("Tassel.Count", "Timestamp"), sep = ",", remove = FALSE) %>% #old
-     #separate(col = "Timestamp", into = c("Timestamp", NA), sep = " ", remove = TRUE) %>% #old 
-    #filter(Flowering.Time=="2023-10-10") %>%  
-    filter(Flowering.Time== reactive_date()) %>%
-    #filter(Timestamp==reactive_date()) %>% 
-    select(germplasmName, germplasmDbId, Sex..M.F.WM) %>%
-    group_by(germplasmName, germplasmDbId, Sex..M.F.WM) %>%
+    set_names(~(.)%>% str_replace_all("SUGARCANE.*","") %>% str_replace_all("\\.","")) %>%  # take CO term out of colnames
+    filter(FloweringTime== reactive_date()) %>% 
+    select(germplasmName, germplasmDbId, SexMFWM) %>% 
+    group_by(germplasmName, germplasmDbId, SexMFWM) %>% 
     summarise(count = n()) %>%
-    # add_column(Number.Used = 0) %>% # take this away for now
-    rename(Clone = germplasmName, Flowering.Count = count, Sex = Sex..M.F.WM) }}))
+    rename(Clone = germplasmName, FloweringCount = count, Sex = SexMFWM) }}))
 
   output$inventoryTable <- ({
     renderDT(inventory_init()[,-which(colnames(inventory_init())=="germplasmDbId")], options = list(language = list(
@@ -267,6 +300,7 @@ server <- function(input, output) {
     You may need to wait a few minutes if inventory records were recently uploaded"
     )))
   })
+  
   # take the away for now
   # , editable=list(target="column", disable=list(columns=c(0:2)))
 
@@ -333,11 +367,14 @@ server <- function(input, output) {
   ## Performance ----
   performance_init <- eventReactive(input$makeperformance, withProgress(message = "Pulling Performance Data", {{ germplasm <- as.data.frame(inventory_init())
   germplasm<-germplasm[duplicated(germplasm$Clone)==FALSE,]
-    tmp <- list()
+    
+  #pull phenotype data for each item in inventory table ('germplasm')
+  tmp <- list()
     for (i in 1:dim(germplasm)[1]) {
       tmp[[i]] <- brapi::ba_phenotypes_search(con = brap, germplasmDbId = as.character(germplasm[i, 2]), rclass = "data.frame", observationLevel = "plot", pageSize = 20000)
     }
 
+  #if item does not have any phenotype data, remove it from the list
     tmp2 <- list()
     j <- 1
     for (i in 1:length(tmp)) {
@@ -347,36 +384,46 @@ server <- function(input, output) {
       }
     }
 
+    #bind all list elements together into one table
     tmp2 <- bind_rows(tmp2)
     
-    #extract stage information from study name
+    #extract stage information from study name (Needs to be updated)
     tmp2$Advanced<-str_extract(tmp2$studyName, "S3|S4|Stage 2|OUTFIELD|INFIELD|NURSERY")
     
-    #aggregate just by germplasm name
+    #aggregate 'Advanced' data by germplasm name - (function= print unique terms)
     s<-aggregate(Advanced~germplasmName, unique, data=tmp2)
-      #remove quotes and parentheses from output 
+      
+    #clean up -- remove quotes and parentheses from output 
     s$Advanced<-gsub("c\\(|\\)","", s$Advanced)
     s$Advanced<-noquote(gsub('"', "", s$Advanced)) #why this works only in two steps, I do not know
     
-
+    #aggregate (function=mean) all other phenotypic data by germplasm name, 
     v <- aggregate(as.numeric(observations.value) ~ observations.observationVariableName + germplasmName, mean, data = tmp2, na.action = na.omit)
     colnames(v)[3] <- "observations.value"
     v$observations.value <- round(as.numeric(v$observations.value), 2)
     v$observations.observationVariableName <- paste0(v$observations.observationVariableName, " mean")
 
+    
+    #aggregate (function=standard deviation) all other phenotypic data by germplasm name, 
     w <- aggregate(observations.value ~ observations.observationVariableName + germplasmName, sd, data = tmp2, na.action = na.omit)
     w$observations.value <- round(as.numeric(w$observations.value), 2)
     w$observations.observationVariableName <- paste0(w$observations.observationVariableName, " sd")
 
+    #aggregate (function=count of observations) all other phenotypic data by germplasm name, 
     x <- aggregate(observations.value ~ observations.observationVariableName + germplasmName, length, data = tmp2, na.action = na.omit)
     x$observations.value <- round(as.numeric(x$observations.value), 2)
     x$observations.observationVariableName <- paste0(x$observations.observationVariableName, " count")
 
+    #bind all numeric data together
     z <- rbind(v, w, x)
 
+    #reshape
     y <- reshape2::dcast(z, germplasmName ~ observations.observationVariableName)
+   
+    #join with Advanced data
     s <-s %>% right_join(y) %>%  rename(Clone = germplasmName)}}))
 
+  #the rest of this is the column picker
   output$colSelect <- renderUI({
     pickerInput(
       inputId = "phenoPick",
@@ -397,6 +444,16 @@ server <- function(input, output) {
     renderDT(datasetInput(), extensions = "FixedColumns", options = list(
       scrollX = TRUE, fixedColumns = list(leftColumns = 2)
     ))
+  })
+
+  output$traitScatterPlot <- renderPlotly({
+    # Check if both X-axis and Y-axis columns are selected
+    if (!is.null(input$xAxis) && !is.null(input$yAxis)) {
+      browser()
+      # Create a scatter plot using plot_ly
+      plot_ly(data = performance_init(), x = ~get(input$xAxis), y = ~get(input$yAxis), type = 'scatter', mode = 'markers') %>%
+        layout(title = "Trait Scatter Plot", xaxis = list(title = input$xAxis), yaxis = list(title = input$yAxis))
+    }
   })
 
   ## Crosses ----
