@@ -188,8 +188,8 @@ ui <- dashboardPage(
             "Trait Scatter Plot",
             fluidRow(
               box(
-                selectInput("xAxis", "Select X-Axis:", choices = NULL),
-                selectInput("yAxis", "Select Y-Axis:", choices = NULL),  
+                # selectInput("xAxis", "Select X-Axis:", choices=NULL),
+                # selectInput("yAxis", "Select Y-Axis:", choices = NULL),
                 plotlyOutput("traitScatterPlot")
               )
             )
@@ -239,9 +239,6 @@ ui <- dashboardPage(
 
 
 
-
-
-
 # SERVER ---------------------------------------
 
 server <- function(input, output) {
@@ -250,12 +247,19 @@ server <- function(input, output) {
     input$date
   })
 
+  rv <- reactiveValues(selectedColumns = NULL)
+  
+  # Update selectedColumns when the user selects new columns in the Performance tab
+  observeEvent(input$selectCol, {
+    rv$selectedColumns <- input$phenoPick
+  })
+
  
 
   output$traitScatterPlot <- renderPlotly({
-    if (!is.null(input$xAxis) && !is.null(input$yAxis)) {
-      plot_ly(data = performance_data(), x = ~get(input$xAxis), y = ~get(input$yAxis), type = 'scatter', mode = 'markers') %>%
-        layout(title = "Trait Scatter Plot", xaxis = list(title = input$xAxis), yaxis = list(title = input$yAxis))
+    if (!is.null(rv$selectedColumns) && length(rv$selectedColumns) == 2) {
+      plot_ly(data = performance_init(), x = ~get(rv$selectedColumns[1]), y = ~get(rv$selectedColumns[2]), type = 'scatter', mode = 'markers') %>%
+        layout(title = "Trait Scatter Plot", xaxis = list(title = rv$selectedColumns[1]), yaxis = list(title = rv$selectedColumns[2]))
     }
   })
 
@@ -332,9 +336,9 @@ server <- function(input, output) {
 
     pedigree[, -which(colnames(pedigree) == "data.germplasmDbId")] }}))
 
-  pedmatrix_init <- eventReactive(input$makepedigree, {{ germplasm <<- as.data.frame(inventory_init())
+    pedmatrix_init <- eventReactive(input$makepedigree, {{ germplasm <<- as.data.frame(inventory_init())
   
-  germplasm<-germplasm[duplicated(germplasm$Clone)==FALSE,]
+    germplasm<-germplasm[duplicated(germplasm$Clone)==FALSE,]
   
     mat <- PedMatrix(pedigree_download)
 
@@ -445,16 +449,34 @@ server <- function(input, output) {
       scrollX = TRUE, fixedColumns = list(leftColumns = 2)
     ))
   })
+  # create scatter plot
+  output$scatterPlotDropdown <- renderUI({
+    pickerInput(
+      inputId = "scatterPick",
+      label = "Choose columns for scatter plot",
+      choices = colnames(performance_init()),
+      options = list('actions-box' = TRUE), multiple = T
+    )
+  })
 
-  output$traitScatterPlot <- renderPlotly({
-    # Check if both X-axis and Y-axis columns are selected
-    if (!is.null(input$xAxis) && !is.null(input$yAxis)) {
-      browser()
-      # Create a scatter plot using plot_ly
-      plot_ly(data = performance_init(), x = ~get(input$xAxis), y = ~get(input$yAxis), type = 'scatter', mode = 'markers') %>%
-        layout(title = "Trait Scatter Plot", xaxis = list(title = input$xAxis), yaxis = list(title = input$yAxis))
+  scatterPlotData <- eventReactive(input$scatterPick, {
+    if (length(input$scatterPick) == 2) {
+      performance_init() %>%
+        select(input$scatterPick)
+    } else {
+      NULL
     }
   })
+
+  output$scatterPlot <- renderPlotly({
+    if (!is.null(scatterPlotData())) {
+      plot_ly(data = scatterPlotData(), x = ~get(input$scatterPick[1]), y = ~get(input$scatterPick[2]), type = 'scatter', mode = 'markers') %>%
+        layout(title = "Scatter Plot", xaxis = list(title = input$scatterPick[1]), yaxis = list(title = input$scatterPick[2]))
+    }
+  })
+  
+    
+
 
   ## Crosses ----
 
