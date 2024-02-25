@@ -56,6 +56,9 @@ ui <- dashboardPage(
       "date",
       "Choose A Date:"
     ),
+    
+    p("for testing, select:", strong("October 10, 2023")),
+    
     actionButton(
       "brapipull",
       "Get Flower Inventory Data"
@@ -251,16 +254,12 @@ server <- function(input, output) {
 
   inventory_init <- eventReactive(input$brapipull, withProgress(message = "Pulling Inventory Data", {{ inven <- data.frame(brapi::ba_studies_table(con = brap, studyDbId = reactive_iid(), rclass="data.frame")) %>%
     filter(observationLevel == "plant") %>% # select just plant rows
-     #separate(col = "Tassel.Count", into = c("Tassel.Count", "Timestamp"), sep = ",", remove = FALSE) %>% #old
-     #separate(col = "Timestamp", into = c("Timestamp", NA), sep = " ", remove = TRUE) %>% #old 
-    #filter(Flowering.Time=="2023-10-10") %>%  
-    filter(Flowering.Time.SUGARCANE.0000045== reactive_date()) %>% #TEMP
-    #filter(Timestamp==reactive_date()) %>% 
-    select(germplasmName, germplasmDbId, Sex..M.F.WM.SUGARCANE.0000097) %>% #TEMP
-    group_by(germplasmName, germplasmDbId, Sex..M.F.WM.SUGARCANE.0000097) %>% #TEMP
+    set_names(~(.)%>% str_replace_all("SUGARCANE.*","") %>% str_replace_all("\\.","")) %>%  # take CO term out of colnames
+    filter(FloweringTime== reactive_date()) %>% 
+    select(germplasmName, germplasmDbId, SexMFWM) %>% 
+    group_by(germplasmName, germplasmDbId, SexMFWM) %>% 
     summarise(count = n()) %>%
-    # add_column(Number.Used = 0) %>% # take this away for now
-    rename(Clone = germplasmName, Flowering.Count = count, Sex = Sex..M.F.WM.SUGARCANE.0000097) }})) #TEMP
+    rename(Clone = germplasmName, FloweringCount = count, Sex = SexMFWM) }}))
 
   output$inventoryTable <- ({
     renderDT(inventory_init()[,-which(colnames(inventory_init())=="germplasmDbId")], options = list(language = list(
@@ -268,6 +267,7 @@ server <- function(input, output) {
     You may need to wait a few minutes if inventory records were recently uploaded"
     )))
   })
+  
   # take the away for now
   # , editable=list(target="column", disable=list(columns=c(0:2)))
 

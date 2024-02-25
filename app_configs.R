@@ -44,16 +44,13 @@ brap2 <- brapi::as.ba_db(
 
 inven <- data.frame(brapi::ba_studies_table(con = brap, studyDbId = "3654", rclass="data.frame")) %>%
   filter(observationLevel == "plant") %>% # select just plant rows
-  #separate(col = "Tassel.Count", into = c("Tassel.Count", "Timestamp"), sep = ",", remove = FALSE) %>% #old
-  #separate(col = "Timestamp", into = c("Timestamp", NA), sep = " ", remove = TRUE) %>% #old
-  filter(Flowering.Time.SUGARCANE.0000045=="2023-10-10") %>%
-  #filter(Flowering.Time== reactive_date()) %>%
-  #filter(Timestamp==reactive_date()) %>%
-  select(germplasmName, germplasmDbId, Sex..M.F.WM.SUGARCANE.0000097) %>%
-  group_by(germplasmName, germplasmDbId, Sex..M.F.WM.SUGARCANE.0000097) %>%
+  set_names(~(.)%>% str_replace_all("SUGARCANE.*","") %>% str_replace_all("\\.","")) %>%
+  filter(FloweringTime=="2023-10-10") %>%
+  #filter(FloweringTime== reactive_date()) %>%
+  select(germplasmName, germplasmDbId, SexMFWM) %>%
+  group_by(germplasmName, germplasmDbId, SexMFWM) %>%
   summarise(count = n()) %>%
-  # add_column(Number.Used = 0) %>% # take this away for now
-  rename(Clone = germplasmName, Flowering.Count = count, Sex = Sex..M.F.WM.SUGARCANE.0000097)
+  rename(Clone = germplasmName, FloweringCount = count, Sex = SexMFWM)
 
 
 #run once
