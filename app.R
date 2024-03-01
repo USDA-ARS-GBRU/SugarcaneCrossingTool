@@ -188,8 +188,6 @@ ui <- dashboardPage(
             "Trait Scatter Plot",
             fluidRow(
               box(
-                # selectInput("xAxis", "Select X-Axis:", choices=NULL),
-                # selectInput("yAxis", "Select Y-Axis:", choices = NULL),
                 plotlyOutput("traitScatterPlot")
               )
             )
@@ -257,11 +255,23 @@ server <- function(input, output) {
  
 
   output$traitScatterPlot <- renderPlotly({
-    if (!is.null(rv$selectedColumns) && length(rv$selectedColumns) == 2) {
-      plot_ly(data = performance_init(), x = ~get(rv$selectedColumns[1]), y = ~get(rv$selectedColumns[2]), type = 'scatter', mode = 'markers') %>%
-        layout(title = "Trait Scatter Plot", xaxis = list(title = rv$selectedColumns[1]), yaxis = list(title = rv$selectedColumns[2]))
-    }
-  })
+  if (!is.null(rv$selectedColumns) && length(rv$selectedColumns) == 2) {
+    plot_ly(
+      data = performance_init(),
+      x = ~get(rv$selectedColumns[1]),
+      y = ~get(rv$selectedColumns[2]),
+      type = 'scatter',
+      mode = 'markers',
+      text = ~Clone,  # Add Clone name to the hover text
+      hoverinfo = 'text'  # Show only the text in the hover info
+    ) %>%
+      layout(
+        title = "Trait Scatter Plot",
+        xaxis = list(title = rv$selectedColumns[1]),
+        yaxis = list(title = rv$selectedColumns[2])
+      )
+  }
+})
 
   reactive_iid<-reactive({input$inventoryid})
   
