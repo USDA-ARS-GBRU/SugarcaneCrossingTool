@@ -369,104 +369,135 @@ server <- function(input, output) {
 
 
   ## Performance ----
-  performance_init <- eventReactive(input$makeperformance, withProgress(message = "Pulling Performance Data", {{ germplasm <- as.data.frame(inventory_init())
-  germplasm<-germplasm[duplicated(germplasm$Clone)==FALSE,]
-    
-  #pull phenotype data for each item in inventory table ('germplasm')
-  tmp <- list()
-    for (i in 1:dim(germplasm)[1]) {
-      tmp[[i]] <- brapi::ba_phenotypes_search(con = brap, germplasmDbId = as.character(germplasm[i, 2]), rclass = "data.frame", observationLevel = "plot", pageSize = 20000)
-    }
+performance_init <- eventReactive(input$makeperformance, withProgress(message = "Pulling Performance Data", {
+  germplasm <- as.data.frame(inventory_init())
+  germplasm <- germplasm[duplicated(germplasm$Clone) == FALSE,]
 
-  #if item does not have any phenotype data, remove it from the list
-    tmp2 <- list()
-    j <- 1
-    for (i in 1:length(tmp)) {
-      if (length(dim(tmp[[i]])) > 0) {
-        tmp2[[j]] <- as.data.frame(tmp[[i]])
-        j <- j + 1
+  # pull phenotype data for each item in inventory table ('germplasm')
+  tmp <- lapply(germplasm$germplasmDbId, function(dbId) {
+    tryCatch(
+      {
+        ba_phenotypes_search(
+          con = brap,
+          germplasmDbId = as.character(dbId),
+          rclass = "data.frame",
+          observationLevel = "plot",
+          pageSize = 20000
+        ) %>%
+          as.data.frame()  # Convert tibbles to data frames
+      },
+      error = function(e) {
+        cat("Error in ba_phenotypes_search for germplasmDbId =", dbId, "\n")
+        return(NULL)
       }
-    }
-
-    #bind all list elements together into one table
-    tmp2 <- bind_rows(tmp2)
-    
-    #extract stage information from study name (Needs to be updated)
-    tmp2$Advanced<-str_extract(tmp2$studyName, "S3|S4|Stage 2|OUTFIELD|INFIELD|NURSERY")
-    
-    #aggregate 'Advanced' data by germplasm name - (function= print unique terms)
-    s<-aggregate(Advanced~germplasmName, unique, data=tmp2)
-      
-    #clean up -- remove quotes and parentheses from output 
-    s$Advanced<-gsub("c\\(|\\)","", s$Advanced)
-    s$Advanced<-noquote(gsub('"', "", s$Advanced)) #why this works only in two steps, I do not know
-    
-    #aggregate (function=mean) all other phenotypic data by germplasm name, 
-    v <- aggregate(as.numeric(observations.value) ~ observations.observationVariableName + germplasmName, mean, data = tmp2, na.action = na.omit)
-    colnames(v)[3] <- "observations.value"
-    v$observations.value <- round(as.numeric(v$observations.value), 2)
-    v$observations.observationVariableName <- paste0(v$observations.observationVariableName, " mean")
-
-    
-    #aggregate (function=standard deviation) all other phenotypic data by germplasm name, 
-    w <- aggregate(observations.value ~ observations.observationVariableName + germplasmName, sd, data = tmp2, na.action = na.omit)
-    w$observations.value <- round(as.numeric(w$observations.value), 2)
-    w$observations.observationVariableName <- paste0(w$observations.observationVariableName, " sd")
-
-    #aggregate (function=count of observations) all other phenotypic data by germplasm name, 
-    x <- aggregate(observations.value ~ observations.observationVariableName + germplasmName, length, data = tmp2, na.action = na.omit)
-    x$observations.value <- round(as.numeric(x$observations.value), 2)
-    x$observations.observationVariableName <- paste0(x$observations.observationVariableName, " count")
-
-    #bind all numeric data together
-    z <- rbind(v, w, x)
-
-    #reshape
-    y <- reshape2::dcast(z, germplasmName ~ observations.observationVariableName)
-   
-    #join with Advanced data
-    s <-s %>% right_join(y) %>%  rename(Clone = germplasmName)}}))
-
-  #the rest of this is the column picker
-  output$colSelect <- renderUI({
-    pickerInput(
-      inputId = "phenoPick",
-      label = "Choose phenotypes to view",
-      choices = colnames(performance_init()),
-      options = list(`actions-box` = TRUE), multiple = T
     )
   })
 
-  datasetInput <- eventReactive(input$selectCol, {
-    datasetInput <- performance_init() %>%
-      select(input$phenoPick)
+  # if item does not have any phenotype data, remove it from the list
+  tmp <- Filter(function(x) !is.null(x) && length(dim(x)) > 0, tmp)
 
-    return(datasetInput)
-  })
+  # bind all list elements together into one table
+  tmp <- bind_rows(tmp)
 
-  output$performanceTable <- ({
-    renderDT(datasetInput(), extensions = "FixedColumns", options = list(
-      scrollX = TRUE, fixedColumns = list(leftColumns = 2)
-    ))
-  })
-  # create scatter plot
-  
-  
+  # extract stage information from study name (Needs to be updated)
+  tmp$Advanced <- str_extract(tmp$studyName, "S3|S4|Stage 2|OUTFIELD|INFIELD|NURSERY")
 
-  datasetInput_scatter <- eventReactive(input$selectCol_scatter, {
-    datasetInput_scatter <- performance_init() %>%
-      select(input$phenoPick_scatter)
+  # aggregate 'Advanced' data by germplasm name
+  s <- aggregate(Advanced ~ germplasmName, unique, data = tmp)
 
-    return(datasetInput_scatter)
-  })
+  # clean up -- remove quotes and parentheses from output
+  s$Advanced <- gsub("c\\(|\\)", "", s$Advanced)
+  s$Advanced <- noquote(gsub('"', "", s$Advanced))
 
-  output$performanceTable_scatter <- ({
-    renderDT(datasetInput_scatter(), extensions = "FixedColumns", options = list(
-      scrollX = TRUE, fixedColumns = list(leftColumns = 2)
-    ))
-  })
+  # aggregate (function = mean) all other phenotypic data by germplasm name,
+  v <- aggregate(
+    as.numeric(observations.value) ~ observations.observationVariableName + germplasmName,
+    mean,
+    data = tmp,
+    na.action = na.omit
+  )
+  colnames(v)[3] <- "observations.value"
+  v$observations.value <- round(as.numeric(v$observations.value), 2)
+  v$observations.observationVariableName <- paste0(v$observations.observationVariableName, " mean")
 
-  output$traitScatterPlot <- renderPlotly({
+  # aggregate (function = standard deviation) all other phenotypic data by germplasm name,
+  w <- aggregate(
+    observations.value ~ observations.observationVariableName + germplasmName,
+    sd,
+    data = tmp,
+    na.action = na.omit
+  )
+  w$observations.value <- round(as.numeric(w$observations.value), 2)
+  w$observations.observationVariableName <- paste0(w$observations.observationVariableName, " sd")
+
+  # aggregate (function = count of observations) all other phenotypic data by germplasm name,
+  x <- aggregate(
+    observations.value ~ observations.observationVariableName + germplasmName,
+    length,
+    data = tmp,
+    na.action = na.omit
+  )
+  x$observations.value <- round(as.numeric(x$observations.value), 2)
+  x$observations.observationVariableName <- paste0(x$observations.observationVariableName, " count")
+
+  # bind all numeric data together
+  z <- rbind(v, w, x)
+
+  # reshape
+  y <- reshape2::dcast(z, germplasmName ~ observations.observationVariableName)
+
+  # join with Advanced data
+  s <- s %>% right_join(y) %>% rename(Clone = germplasmName)
+
+  return(s)
+}))
+
+# the rest of this is the column picker
+output$colSelect <- renderUI({
+  pickerInput(
+    inputId = "phenoPick",
+    label = "Choose phenotypes to view",
+    choices = colnames(performance_init()),
+    options = list(`actions-box` = TRUE),
+    multiple = TRUE
+  )
+})
+
+datasetInput <- eventReactive(input$selectCol, {
+  selectedColumns <- c("Clone", input$phenoPick)
+  datasetInput <- performance_init() %>%
+    select(selectedColumns)
+
+  return(datasetInput)
+})
+
+output$performanceTable <- renderDT({
+  datasetInput() %>%
+    select(Clone, everything())
+}, extensions = "FixedColumns", options = list(
+  scrollX = TRUE, fixedColumns = list(leftColumns = 2)
+))
+
+# create scatter plot
+datasetInput_scatter <- eventReactive(input$selectCol_scatter, {
+  datasetInput_scatter <- performance_init() %>%
+    select(input$phenoPick_scatter)
+
+  return(datasetInput_scatter)
+})
+
+output$performanceTable_scatter <- renderDT({
+  datasetInput_scatter() %>%
+    select(Clone, everything())
+}, extensions = "FixedColumns", options = list(
+  scrollX = TRUE, fixedColumns = list(leftColumns = 2)
+))
+
+observeEvent(input$selectCol_scatter, {
+  rv_trait_scatter$selectedColumns <- input$phenoPick_scatter
+})
+
+output$traitScatterPlot <- renderPlotly({
   req(input$phenoPick_scatter)  # Ensure that input$phenoPick_scatter is not NULL
 
   rv_trait_scatter$selectedColumns <- input$phenoPick_scatter
@@ -492,35 +523,15 @@ server <- function(input, output) {
   }
 })
 
-  output$scatterPlotDropdown <- renderUI({
-    selectInput(
-      inputId = "phenoPick_scatter",
-      label = "Choose phenotypes to view",
-      choices = colnames(performance_init()),
-      selected = rv_trait_scatter$selectedColumns,
-      multiple = T
-    )
-  })
-  
-
-
-  
-
-  scatterPlotData <- eventReactive(input$scatterPick, {
-    if (length(input$scatterPick) == 2) {
-      performance_init() %>%
-        select(input$scatterPick)
-    } else {
-      NULL
-    }
-  })
-
-  # output$scatterPlot <- renderPlotly({
-  #   if (!is.null(scatterPlotData())) {
-  #     plot_ly(data = scatterPlotData(), x = ~get(input$scatterPick[1]), y = ~get(input$scatterPick[2]), type = 'scatter', mode = 'markers') %>%
-  #       layout(title = "Scatter Plot", xaxis = list(title = input$scatterPick[1]), yaxis = list(title = input$scatterPick[2]))
-  #   }
-  # })
+output$scatterPlotDropdown <- renderUI({
+  selectInput(
+    inputId = "phenoPick_scatter",
+    label = "Choose phenotypes to view",
+    choices = colnames(performance_init()),
+    selected = rv_trait_scatter$selectedColumns,
+    multiple = TRUE
+  )
+})
   
     
 
