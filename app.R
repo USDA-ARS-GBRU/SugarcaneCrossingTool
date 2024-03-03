@@ -188,6 +188,7 @@ ui <- dashboardPage(
             "Trait Scatter Plot",
             fluidRow(
               box(
+                uiOutput("scatterPlotDropdown"),
                 plotlyOutput("traitScatterPlot")
               )
             )
@@ -246,32 +247,21 @@ server <- function(input, output) {
   })
 
   rv <- reactiveValues(selectedColumns = NULL)
+  rv_trait_scatter <- reactiveValues(selectedColumns = NULL)
+
+  
+
+  
   
   # Update selectedColumns when the user selects new columns in the Performance tab
   observeEvent(input$selectCol, {
     rv$selectedColumns <- input$phenoPick
+    rv_trait_scatter$selectedColumns <- input$phenoPick
   })
 
- 
-
-  output$traitScatterPlot <- renderPlotly({
-  if (!is.null(rv$selectedColumns) && length(rv$selectedColumns) == 2) {
-    plot_ly(
-      data = performance_init(),
-      x = ~get(rv$selectedColumns[1]),
-      y = ~get(rv$selectedColumns[2]),
-      type = 'scatter',
-      mode = 'markers',
-      text = ~Clone,  # Add Clone name to the hover text
-      hoverinfo = 'text'  # Show only the text in the hover info
-    ) %>%
-      layout(
-        title = "Trait Scatter Plot",
-        xaxis = list(title = rv$selectedColumns[1]),
-        yaxis = list(title = rv$selectedColumns[2])
-      )
-  }
-})
+  observeEvent(input$selectCol_scatter, {
+    rv_trait_scatter$selectedColumns <- input$phenoPick_scatter
+  })
 
   reactive_iid<-reactive({input$inventoryid})
   
@@ -460,14 +450,61 @@ server <- function(input, output) {
     ))
   })
   # create scatter plot
+  
+  
+
+  datasetInput_scatter <- eventReactive(input$selectCol_scatter, {
+    datasetInput_scatter <- performance_init() %>%
+      select(input$phenoPick_scatter)
+
+    return(datasetInput_scatter)
+  })
+
+  output$performanceTable_scatter <- ({
+    renderDT(datasetInput_scatter(), extensions = "FixedColumns", options = list(
+      scrollX = TRUE, fixedColumns = list(leftColumns = 2)
+    ))
+  })
+
+  output$traitScatterPlot <- renderPlotly({
+  req(input$phenoPick_scatter)  # Ensure that input$phenoPick_scatter is not NULL
+
+  rv_trait_scatter$selectedColumns <- input$phenoPick_scatter
+
+  if (!is.null(rv_trait_scatter$selectedColumns) && length(rv_trait_scatter$selectedColumns) >= 2) {
+    selectedData <- performance_init() %>%
+      select(Clone, rv_trait_scatter$selectedColumns[1], rv_trait_scatter$selectedColumns[2])
+
+    plot_ly(
+      data = selectedData,
+      x = ~get(rv_trait_scatter$selectedColumns[1]),
+      y = ~get(rv_trait_scatter$selectedColumns[2]),
+      type = 'scatter',
+      mode = 'markers',
+      text = ~Clone,
+      hoverinfo = 'text'
+    ) %>%
+      layout(
+        title = "Trait Scatter Plot",
+        xaxis = list(title = rv_trait_scatter$selectedColumns[1]),
+        yaxis = list(title = rv_trait_scatter$selectedColumns[2])
+      )
+  }
+})
+
   output$scatterPlotDropdown <- renderUI({
-    pickerInput(
-      inputId = "scatterPick",
-      label = "Choose columns for scatter plot",
+    selectInput(
+      inputId = "phenoPick_scatter",
+      label = "Choose phenotypes to view",
       choices = colnames(performance_init()),
-      options = list('actions-box' = TRUE), multiple = T
+      selected = rv_trait_scatter$selectedColumns,
+      multiple = T
     )
   })
+  
+
+
+  
 
   scatterPlotData <- eventReactive(input$scatterPick, {
     if (length(input$scatterPick) == 2) {
@@ -478,12 +515,12 @@ server <- function(input, output) {
     }
   })
 
-  output$scatterPlot <- renderPlotly({
-    if (!is.null(scatterPlotData())) {
-      plot_ly(data = scatterPlotData(), x = ~get(input$scatterPick[1]), y = ~get(input$scatterPick[2]), type = 'scatter', mode = 'markers') %>%
-        layout(title = "Scatter Plot", xaxis = list(title = input$scatterPick[1]), yaxis = list(title = input$scatterPick[2]))
-    }
-  })
+  # output$scatterPlot <- renderPlotly({
+  #   if (!is.null(scatterPlotData())) {
+  #     plot_ly(data = scatterPlotData(), x = ~get(input$scatterPick[1]), y = ~get(input$scatterPick[2]), type = 'scatter', mode = 'markers') %>%
+  #       layout(title = "Scatter Plot", xaxis = list(title = input$scatterPick[1]), yaxis = list(title = input$scatterPick[2]))
+  #   }
+  # })
   
     
 
