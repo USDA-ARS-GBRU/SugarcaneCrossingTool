@@ -188,7 +188,8 @@ ui <- dashboardPage(
             "Trait Scatter Plot",
             fluidRow(
               box(
-                uiOutput("scatterPlotDropdown"),
+                uiOutput("scatterPlotDropdown_x"),
+                uiOutput("scatterPlotDropdown_y"),
                 plotlyOutput("traitScatterPlot")
               )
             )
@@ -240,7 +241,7 @@ ui <- dashboardPage(
 
 # SERVER ---------------------------------------
 
-server <- function(input, output) {
+server <- function(input, output, session) {
   # choose date
   reactive_date <- reactive({
     input$date
@@ -258,6 +259,21 @@ server <- function(input, output) {
     rv$selectedColumns <- input$phenoPick
     rv_trait_scatter$selectedColumns <- input$phenoPick
   })
+
+  observe({
+  phenotypes <- input$phenoPick
+
+  # Update X-axis dropdown
+  updateSelectInput(session, "xAxis_scatter", choices = phenotypes, selected = phenotypes[1])
+
+  # Update Y-axis dropdown
+  updateSelectInput(session, "yAxis_scatter", choices = phenotypes, selected = phenotypes[2])
+})
+
+observeEvent(input$selectCol_scatter, {
+  rv_trait_scatter$xAxis <- input$xAxis_scatter
+  rv_trait_scatter$yAxis <- input$yAxis_scatter
+})
 
   observeEvent(input$selectCol_scatter, {
     rv_trait_scatter$selectedColumns <- input$phenoPick_scatter
@@ -478,10 +494,11 @@ output$performanceTable <- renderDT({
   scrollX = TRUE, fixedColumns = list(leftColumns = 2)
 ))
 
+
 # create scatter plot
 datasetInput_scatter <- eventReactive(input$selectCol_scatter, {
   datasetInput_scatter <- performance_init() %>%
-    select(input$phenoPick_scatter)
+    select(input$xAxis_scatter, input$yAxis_scatter)
 
   return(datasetInput_scatter)
 })
@@ -493,23 +510,25 @@ output$performanceTable_scatter <- renderDT({
   scrollX = TRUE, fixedColumns = list(leftColumns = 2)
 ))
 
-observeEvent(input$selectCol_scatter, {
-  rv_trait_scatter$selectedColumns <- input$phenoPick_scatter
-})
+
 
 output$traitScatterPlot <- renderPlotly({
-  req(input$phenoPick_scatter)  # Ensure that input$phenoPick_scatter is not NULL
+  req(input$xAxis_scatter, input$yAxis_scatter)
 
-  rv_trait_scatter$selectedColumns <- input$phenoPick_scatter
+  rv_trait_scatter$xAxis <- input$xAxis_scatter
+  rv_trait_scatter$yAxis <- input$yAxis_scatter
 
-  if (!is.null(rv_trait_scatter$selectedColumns) && length(rv_trait_scatter$selectedColumns) >= 2) {
+  if (!is.null(rv_trait_scatter$xAxis) && !is.null(rv_trait_scatter$yAxis)) {
     selectedData <- performance_init() %>%
-      select(Clone, rv_trait_scatter$selectedColumns[1], rv_trait_scatter$selectedColumns[2])
+      select(Clone, rv_trait_scatter$xAxis, rv_trait_scatter$yAxis)
+
+    x_col <- as.name(rv_trait_scatter$xAxis)
+    y_col <- as.name(rv_trait_scatter$yAxis)
 
     plot_ly(
       data = selectedData,
-      x = ~get(rv_trait_scatter$selectedColumns[1]),
-      y = ~get(rv_trait_scatter$selectedColumns[2]),
+      x = ~selectedData[[x_col]],
+      y = ~selectedData[[y_col]],
       type = 'scatter',
       mode = 'markers',
       text = ~Clone,
@@ -517,19 +536,27 @@ output$traitScatterPlot <- renderPlotly({
     ) %>%
       layout(
         title = "Trait Scatter Plot",
-        xaxis = list(title = rv_trait_scatter$selectedColumns[1]),
-        yaxis = list(title = rv_trait_scatter$selectedColumns[2])
+        xaxis = list(title = rv_trait_scatter$xAxis),
+        yaxis = list(title = rv_trait_scatter$yAxis)
       )
   }
 })
 
-output$scatterPlotDropdown <- renderUI({
+output$scatterPlotDropdown_x <- renderUI({
   selectInput(
-    inputId = "phenoPick_scatter",
-    label = "Choose phenotypes to view",
+    inputId = "xAxis_scatter",
+    label = "Choose X-axis",
     choices = colnames(performance_init()),
-    selected = rv_trait_scatter$selectedColumns,
-    multiple = TRUE
+    selected = rv_trait_scatter$xAxis
+  )
+})
+
+output$scatterPlotDropdown_y <- renderUI({
+  selectInput(
+    inputId = "yAxis_scatter",
+    label = "Choose Y-axis",
+    choices = colnames(performance_init()),
+    selected = rv_trait_scatter$yAxis
   )
 })
   
