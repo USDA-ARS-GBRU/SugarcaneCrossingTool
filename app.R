@@ -385,6 +385,7 @@ observeEvent(input$selectCol_scatter, {
 
 
   ## Performance ----
+
 performance_init <- eventReactive(input$makeperformance, withProgress(message = "Pulling Performance Data", {
   germplasm <- as.data.frame(inventory_init())
   germplasm <- germplasm[duplicated(germplasm$Clone) == FALSE,]
@@ -408,6 +409,7 @@ performance_init <- eventReactive(input$makeperformance, withProgress(message = 
       }
     )
   })
+
 
   # if item does not have any phenotype data, remove it from the list
   tmp <- Filter(function(x) !is.null(x) && length(dim(x)) > 0, tmp)
@@ -458,6 +460,7 @@ performance_init <- eventReactive(input$makeperformance, withProgress(message = 
 
   # bind all numeric data together
   z <- rbind(v, w, x)
+
 
   # reshape
   y <- reshape2::dcast(z, germplasmName ~ observations.observationVariableName)
