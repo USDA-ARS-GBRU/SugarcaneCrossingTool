@@ -137,30 +137,35 @@ ui <- dashboardPage(
       ### Pedigree tab content ----
 
       tabItem(
-        tabName = "kinship",
-        tabsetPanel(
-          type = "tabs",
-          tabPanel(
-            "Pedigree Table",
-            fluidRow(
-              box(
-                actionButton(
-                  inputId = "makepedigree",
-                  label = "Get Pedigree Data"
-                ),
-                p("This table shows you the pedigree of each clone that is flowering on the date you selected, 
-                    as well as the number of progeny it produced and it's relatedness (0-1+) to LCP85-384.")
-              ),
-              DTOutput("pedigreeTable"),
-            )
+  tabName = "kinship",
+  tabsetPanel(
+    type = "tabs",
+    tabPanel(
+      "Pedigree Table",
+      fluidRow(
+        box(
+          actionButton(
+            inputId = "makepedigree",
+            label = "Get Pedigree Data"
           ),
-          tabPanel(
-            "Relationship Matrix",
-            box(p("This is a relationship matrix of the clones that are flowering on the date you selected. Values closer to one indicated high relatedness. You can zoom in to particular regions of the matrix.")),
-            plotlyOutput("pedigreeMatrix")
-          )
-        )
-      ),
+          p("This table shows you the pedigree of each clone that is flowering on the date you selected, 
+            as well as the number of progeny it produced and its relatedness (0-1+) to LCP85-384.")
+        ),
+        DTOutput("pedigreeTable"),
+      )
+    ),
+    tabPanel(
+      "Relationship Matrix",
+      box(p("This is a relationship matrix of the clones that are flowering on the date you selected. Values closer to one indicate high relatedness. You can zoom in to particular regions of the matrix.")),
+      plotlyOutput("pedigreeMatrix")
+    ),
+    tabPanel(
+      "Visualize Pedigrees",
+      # Add content for the "Visualize Pedigrees" tab panel here
+      # You can include plots, tables, or any other relevant content
+    )
+  )
+),
 
      ### Performance tab content ----
       tabItem(
