@@ -17,6 +17,12 @@ library(data.table)
 library(writexl)
 library(tis)
 library(fresh)
+library(networkD3)
+
+tags$head(
+  tags$script(src = "https://d3js.org/d3.v5.min.js"),
+  tags$script(src = "https://cdnjs.cloudflare.com/ajax/libs/networkD3/0.4.1/networkD3.min.js")
+)
 
 
 ## CUSTOM DATA and FUNCTION LOAD -----------
@@ -41,6 +47,11 @@ ui <- dashboardPage(
     div(class = "p-3", skinSelector()),
     pinned = FALSE
   ),
+
+  
+
+
+
 
 
   ## HEADER --------
@@ -161,8 +172,13 @@ ui <- dashboardPage(
     ),
     tabPanel(
       "Visualize Pedigrees",
-      # Add content for the "Visualize Pedigrees" tab panel here
-      # You can include plots, tables, or any other relevant content
+       fluidRow(
+    box(
+      uiOutput("cloneDropdown"),
+      uiOutput("pedigreeGraphUI"),
+      networkD3::forceNetworkOutput(outputId = "pedigreeGraph")
+    )
+  )
     )
   )
 ),
@@ -247,13 +263,23 @@ ui <- dashboardPage(
 # SERVER ---------------------------------------
 
 server <- function(input, output, session) {
+  library(networkD3)
   # choose date
   reactive_date <- reactive({
     input$date
   })
 
+
+pedigree_data <- reactiveVal()
+
+observeEvent(pedigree_init(), {
+  pedigree_data(pedigree_init())
+})
+
   rv <- reactiveValues(selectedColumns = NULL)
   rv_trait_scatter <- reactiveValues(selectedColumns = NULL)
+
+  selectedClone <- reactiveVal()
 
   
 
@@ -264,6 +290,12 @@ server <- function(input, output, session) {
     rv$selectedColumns <- input$phenoPick
     rv_trait_scatter$selectedColumns <- input$phenoPick
   })
+  
+  observeEvent(input$selectedClone, {
+  selectedClone <- input$selectedClone
+  updateSelectInput(session, "pedigreeGraphUI")
+})
+
 
   observe({
   phenotypes <- input$phenoPick
@@ -283,6 +315,7 @@ observeEvent(input$selectCol_scatter, {
   observeEvent(input$selectCol_scatter, {
     rv_trait_scatter$selectedColumns <- input$phenoPick_scatter
   })
+
 
   reactive_iid<-reactive({input$inventoryid})
   
@@ -334,7 +367,7 @@ observeEvent(input$selectCol_scatter, {
   pedigree_init <- eventReactive(input$makepedigree, withProgress(message = "Pulling Progeny Data", {{ germplasm <- as.data.frame(inventory_init())
     #germplasm<-inven #for testing
     germplasm<-germplasm[duplicated(germplasm$Clone)==FALSE,]
-    
+    selectedClone <- reactiveVal()
     tmp <- stripClass(
       as.data.frame(
         ba_germplasm_details2(con = brap2, germplasmQuery = as.character(paste0("?studyDbId=", reactive_iid(), "&pageSize=1000")), rclass = "data.frame")
@@ -382,11 +415,91 @@ observeEvent(input$selectCol_scatter, {
     ) %>% rename(Rel.2.LCP850384 = "LCP85-0384"), options = list(language = list(
       zeroRecords = "There are no pedigree records to display. Double check that there are inventory records for the date you selected"
     )))
-  }) # this merge fufills user request to see similarity to LCP85-0384
+  }) # this merge fufills user request to see similarity to LCP85-
 
-  output$pedigreeMatrix <- ({
-    renderPlotly(heatmaply(pedmatrix_init()))
-  })
+  output$cloneDropdown <- renderUI({
+  pedigree_data_val <- pedigree_data()
+  selectInput("selectedClone", "Select a Clone", choices = unique(pedigree_data_val$Clone))
+})
+
+output$pedigreeGraph <- renderUI({
+  req(selectedClone())  # Ensure selectedClone has a value
+
+  pedigree_data_val <- pedigree_data()  # Get the current value of pedigree_data
+  selected_clone_val <- input$selectedClone  # Get the current value of selectedClone
+
+  print(pedigree_data_val)  # Debug: Print pedigree_data_val
+  print(selected_clone_val)  # Debug: Print selected_clone_val
+
+  if (!is.null(pedigree_data_val) && nrow(pedigree_data_val) > 0) {
+    subset_data <- pedigree_data_val[pedigree_data_val$Clone == selected_clone_val, ]
+
+    if (nrow(subset_data) > 0) {
+      # Create a data frame for the network graph
+      network_data <- data.frame(
+        from = subset_data$Clone,
+        to = subset_data$Pedigree,
+        value = 1,
+        group = ifelse(grepl("F", subset_data$Pedigree), "Female", "Male")
+      )
+
+      # Debug: Print network_data
+      print(network_data)
+
+      # Create a force network graph
+      graph <- forceNetwork(
+        Links = network_data,
+        Nodes = data.frame(name = unique(c(network_data$from, network_data$to))),
+        Source = "from",
+        Target = "to",
+        Value = "value",
+        NodeID = "name",
+        Group = "group",
+        linkWidth = 2,
+        opacity = 0.9,
+        zoom = TRUE,
+        legend = TRUE,
+        legendSource = "inline",
+        nodeColour = JS(
+          'function(node) {
+             return node.group === "Female" ? "#FF0000" : "#0000FF";
+           }'
+        ),
+        nodeWidth = 20,
+        fontSize = 12
+      )
+
+      # Debug: Print graph
+      print(graph)
+
+      return(graph)
+    } else {
+      print("No data for the selected clone")
+    }
+  } else {
+    print("No pedigree data available")
+  }
+})
+
+# Add this to update the UI with the rendered forceNetwork graph
+output$pedigreeGraphUI <- renderUI({
+  pedigreeGraph <- input$pedigreeGraph
+  if (!is.null(pedigreeGraph)) {
+    pedigreeGraph
+  }
+})
+
+
+
+
+
+
+
+output$pedigreeMatrix <- renderPlotly({
+  pedmatrix_data <- pedmatrix_init()
+  heatmaply(pedmatrix_data)
+})
+
 
 
   ## Performance ----
