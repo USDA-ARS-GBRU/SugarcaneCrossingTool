@@ -281,6 +281,11 @@ observeEvent(pedigree_init(), {
 
   selectedClone <- reactiveVal()
 
+  selected_clone <- reactive({
+  req(input$selectedClone)
+  input$selectedClone
+})
+
   
 
   
@@ -422,64 +427,101 @@ observeEvent(input$selectCol_scatter, {
   selectInput("selectedClone", "Select a Clone", choices = unique(pedigree_data_val$Clone))
 })
 
-output$pedigreeGraph <- renderUI({
-  req(selectedClone())  # Ensure selectedClone has a value
+createPedigreeGraph <- function(data, selectedClone) {
+  browser() # Debugging
+  subset_data <- data[data$Clone == selectedClone, ]
 
-  pedigree_data_val <- pedigree_data()  # Get the current value of pedigree_data
-  selected_clone_val <- input$selectedClone  # Get the current value of selectedClone
+  # Print debugging information
+  print(subset_data)
 
-  print(pedigree_data_val)  # Debug: Print pedigree_data_val
-  print(selected_clone_val)  # Debug: Print selected_clone_val
+  if (nrow(subset_data) > 0) {
+    # Split the pedigree string into female and male parents
+    parents <- strsplit(subset_data$Pedigree, "/")[[1]]
+    female_parent <- parents[1]
+    male_parent <- parents[2]
+
+    # Create a data frame for the network graph
+    network_data <- data.frame(
+      from = c(selectedClone, female_parent, male_parent),
+      to = c(female_parent, male_parent, NA),
+      value = c(1, 1, 1),
+      group = c("Child", "Female", "Male")
+    )
+
+    # Print debugging information
+    print(network_data)
+
+    # Create a node data frame with nodeOpacity
+    node_data <- data.frame(
+      name = unique(c(network_data$from, network_data$to)),
+      group = c(rep("Child", 1), rep("Female", 1), rep("Male", 1)),
+      nodeOpacity = ifelse(node_data$group == "Male" | node_data$group == "Female", 1, 0.5)
+    )
+
+    # Print debugging information
+    print(node_data)
+
+    # Create a force network graph
+    graph <- forceNetwork(
+      Links = network_data,
+      Nodes = node_data,
+      Source = "from",
+      Target = "to",
+      Value = "value",
+      NodeID = "name",
+      Group = "group",
+      linkWidth = JS(2),
+      opacity = 0.9,
+      zoom = TRUE,
+      fontSize = 12,
+      colourScale = JS('function(d) {
+        if (d.group === "Male") {
+          return "blue";
+        } else if (d.group === "Female") {
+          return "red";
+        } else {
+          return "green";
+        }
+      }')
+    )
+
+    # Print debugging information
+    print(graph)
+
+    return(list(graph = graph, node_data = node_data))
+  } else {
+    return(NULL)
+  }
+}
+
+
+
+output$pedigreeGraphUI <- renderUI({
+  req(input$selectedClone)
+
+  pedigree_data_val <- pedigree_data()
+
+  # Print debugging information
+  print(input$selectedClone)
+  print(pedigree_data_val)
+
 
   if (!is.null(pedigree_data_val) && nrow(pedigree_data_val) > 0) {
-    subset_data <- pedigree_data_val[pedigree_data_val$Clone == selected_clone_val, ]
+    result <- createPedigreeGraph(pedigree_data_val, input$selectedClone)
 
-    if (nrow(subset_data) > 0) {
-      # Create a data frame for the network graph
-      network_data <- data.frame(
-        from = subset_data$Clone,
-        to = subset_data$Pedigree,
-        value = 1,
-        group = ifelse(grepl("F", subset_data$Pedigree), "Female", "Male")
-      )
+    # Print debugging information
+    print(result)
 
-      # Debug: Print network_data
-      print(network_data)
-
-      # Create a force network graph
-      graph <- forceNetwork(
-        Links = network_data,
-        Nodes = data.frame(name = unique(c(network_data$from, network_data$to))),
-        Source = "from",
-        Target = "to",
-        Value = "value",
-        NodeID = "name",
-        Group = "group",
-        linkWidth = 2,
-        opacity = 0.9,
-        zoom = TRUE,
-        legend = TRUE,
-        legendSource = "inline",
-        nodeColour = JS(
-          'function(node) {
-             return node.group === "Female" ? "#FF0000" : "#0000FF";
-           }'
-        ),
-        nodeWidth = 20,
-        fontSize = 12
-      )
-
-      # Debug: Print graph
-      print(graph)
-
-      return(graph)
+    if (!is.null(result)) {
+      return(result$graph)
     } else {
-      print("No data for the selected clone")
+      return("No data for the selected clone")
     }
   } else {
-    print("No pedigree data available")
+    return("No pedigree data available")
   }
 })
+
 
 # Add this to update the UI with the rendered forceNetwork graph
 output$pedigreeGraphUI <- renderUI({
