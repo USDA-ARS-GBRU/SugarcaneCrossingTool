@@ -175,8 +175,7 @@ ui <- dashboardPage(
        fluidRow(
     box(
       uiOutput("cloneDropdown"),
-      uiOutput("pedigreeGraphUI"),
-      networkD3::forceNetworkOutput(outputId = "pedigreeGraph")
+      visNetworkOutput("pedigreeGraph")
     )
   )
     )
@@ -446,10 +445,14 @@ output$cloneDropdown <- renderUI({
   selectInput("selectedClone", "Select a Clone", choices = unique(pedigree_init()$Clone))
 })
 
+# Install and load the visNetwork package
+
+
 createPedigreeGraph <- function(data, selectedClone) {
   subset_data <- data[data$Clone == selectedClone, ]
 
   # Print debugging information
+  print("Selected clone data:")
   print(subset_data)
 
   if (nrow(subset_data) > 0 && !is.na(subset_data$Pedigree[1])) {
@@ -460,93 +463,72 @@ createPedigreeGraph <- function(data, selectedClone) {
       female_parent <- parents[1]
       male_parent <- parents[2]
 
-      # Create a data frame for the network graph
-      network_data <- data.frame(
-        from = c(selectedClone, female_parent, male_parent),
-        to = c(female_parent, male_parent, NA),
+      # Create a data frame for nodes
+      nodes <- data.frame(
+        id = c(selectedClone, female_parent, male_parent),
+        label = c(selectedClone, female_parent, male_parent),
+        group = c("Child", "Female", "Male"),
         value = c(1, 1, 1),
-        group = c("Child", "Female", "Male")
+        color = c("yellow", "red", "blue"),
+        stringsAsFactors = FALSE
       )
 
-      # Print debugging information
-      print(network_data)
-
-      # Create a node data frame with nodeOpacity
-      node_data <- data.frame(
-        name = unique(c(network_data$from, network_data$to)),
-        group = c(rep("Child", 1), rep("Female", 1), rep("Male", 1)),
-        nodeOpacity = ifelse(node_data$group == "Male" | node_data$group == "Female", 1, 0.5)
+      # Create a data frame for edges
+      edges <- data.frame(
+        from = c(female_parent, male_parent),
+        to = c(selectedClone, selectedClone),
+        arrows = "to",
+        stringsAsFactors = FALSE
       )
 
-      # Print debugging information
-      print(node_data)
-
-      # Create a force network graph
-      graph <- forceNetwork(
-        Links = network_data,
-        Nodes = node_data,
-        Source = "from",
-        Target = "to",
-        Value = "value",
-        NodeID = "name",
-        Group = "group",
-        linkWidth = JS(2),
-        opacity = 0.9,
-        zoom = TRUE,
-        fontSize = 12,
-        colourScale = JS('function(d) {
-          if (d.group === "Male") {
-            return "blue";
-          } else if (d.group === "Female") {
-            return "red";
-          } else {
-            return "green";
-          }
-        }')
-      )
+      # Create a visNetwork graph
+      graph <- visNetwork(nodes, edges) %>%
+        visNodes(shape = "dot", size = 20, font = list(size = 12)) %>%
+        visEdges(arrows = "to") %>%
+        visLayout(randomSeed = 123) %>%
+        visOptions(highlightNearest = list(enabled = TRUE, degree = 1))
 
       # Print debugging information
+      print("Graph created:")
       print(graph)
 
       return(graph)
     } else {
+      print("Error: Insufficient parents in the pedigree data")
       return(NULL)
     }
   } else {
+    print("Error: No data or missing pedigree for the selected clone")
     return(NULL)
   }
 }
 
-output$pedigreeGraphUI <- renderUI({
+output$pedigreeGraph <- renderVisNetwork({
   req(input$selectedClone)
 
   pedigree_data_val <- pedigree_init()
 
   # Print debugging information
+  print("Selected clone:")
   print(input$selectedClone)
+
+  print("Pedigree data:")
   print(pedigree_data_val)
 
   if (!is.null(pedigree_data_val) && nrow(pedigree_data_val) > 0) {
     graph <- createPedigreeGraph(pedigree_data_val, input$selectedClone)
 
     # Print debugging information
+    print("Graph:")
     print(graph)
 
     if (!is.null(graph)) {
       return(graph)
     } else {
-      return("No data for the selected clone")
+      return(NULL)
     }
   } else {
-    return("No pedigree data available")
-  }
-})
-
-# Add this to update the UI with the rendered forceNetwork graph
-output$pedigreeGraphUI <- renderUI({
-  pedigreeGraph <- input$pedigreeGraph
-  if (!is.null(pedigreeGraph)) {
-    pedigreeGraph
+    return(NULL)
   }
 })
 
