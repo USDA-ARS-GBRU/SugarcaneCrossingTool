@@ -18,6 +18,7 @@ library(writexl)
 library(tis)
 library(fresh)
 library(networkD3)
+library(visNetwork)
 
 tags$head(
   tags$script(src = "https://d3js.org/d3.v5.min.js"),
@@ -57,51 +58,50 @@ ui <- dashboardPage(
   ## HEADER --------
   header = dashboardHeader(title = "Sugarcane Crossing Tool"),
 
-  ## SIDEBAR ------
-  sidebar = dashboardSidebar(
-    
-    textInput("inventoryid", "Login with your IID:", value=""),
-    textInput("crossesid", "Login with your CID:", value=""),
-    
-    dateInput(
-      "date",
-      "Choose A Date:"
-    ),
-    
-    p("for testing, select:", strong("October 10, 2023")),
-    
-    actionButton(
-      "brapipull",
-      "Get Flower Inventory Data"
-    ),
-    p("Don't forget to push 'Get Flower Inventory Data'", strong("each"), "each time you choose a new date"),
-    sidebarMenu(
-      menuItem("Home",
-        tabName = "home",
-        icon = icon("home")
-      ),
-      menuItem("Flowering Inventory",
-        tabName = "flowering",
-        icon = icon("seedling")
-      ),
-      menuItem("Kinship/Pedigree",
-        tabName = "kinship",
-        icon = icon("people-group")
-      ),
-      menuItem("Clone Performance",
-        tabName = "performance",
-        icon = icon("star")
-      ),
-      menuItem("Previous Crosses",
-        tabName = "crosses",
-        icon = icon("xmark")
-      ),
-      menuItem("Download Data",
-        tabName = "download",
-        icon = icon("download")
-      )
-    )
+## SIDEBAR ------
+sidebar = dashboardSidebar(
+  selectInput("location", "Select Location:", choices = c("Florida" = "3654", "Louisiana" = "3678")),
+  textInput("crossesid", "Login with your CID:", value=""),
+  
+  dateInput(
+    "date",
+    "Choose A Date:"
   ),
+  
+  p("for testing, select:", strong("October 10, 2023")),
+  
+  actionButton(
+    "brapipull",
+    "Get Flower Inventory Data"
+  ),
+  p("Don't forget to push 'Get Flower Inventory Data'", strong("each"), "each time you choose a new date"),
+  sidebarMenu(
+    menuItem("Home",
+      tabName = "home",
+      icon = icon("home")
+    ),
+    menuItem("Flowering Inventory",
+      tabName = "flowering",
+      icon = icon("seedling")
+    ),
+    menuItem("Kinship/Pedigree",
+      tabName = "kinship",
+      icon = icon("people-group")
+    ),
+    menuItem("Clone Performance",
+      tabName = "performance",
+      icon = icon("star")
+    ),
+    menuItem("Previous Crosses",
+      tabName = "crosses",
+      icon = icon("xmark")
+    ),
+    menuItem("Download Data",
+      tabName = "download",
+      icon = icon("download")
+    )
+  )
+),
 
   ## BODY -----
 
@@ -141,6 +141,7 @@ ui <- dashboardPage(
         tabName = "flowering",
         fluidRow(
           box(p("This table shows you the count and sex of each clone that is flowering on the day you selected.")),
+          textOutput("dataSourceText"),
           DTOutput("inventoryTable")
         )
       ),
@@ -269,6 +270,9 @@ server <- function(input, output, session) {
   })
 
 
+  dataSource <- reactiveVal()
+
+
 
   rv <- reactiveValues(selectedColumns = NULL)
   rv_trait_scatter <- reactiveValues(selectedColumns = NULL)
@@ -316,7 +320,9 @@ observeEvent(input$selectCol_scatter, {
   })
 
 
-  reactive_iid<-reactive({input$inventoryid})
+  reactive_iid <- reactive({
+  as.character(input$location)
+})
   
   reactive_cid<-reactive({input$crossesid})
   
@@ -324,12 +330,11 @@ observeEvent(input$selectCol_scatter, {
 
   # point to current study
   
-  output$inventoryPointer <- renderText({
-   validate(
-     need(input$inventoryid != "", "Please log in with your IID")
-   )
-   unique(brapi::ba_studies_table(con = brap, studyDbId = as.character(input$inventoryid))$studyName)
- })
+ output$inventoryPointer <- renderText({
+  location <- ifelse(input$location == "3654", "Florida", "Louisiana")
+  paste("Location:", location, "-", unique(brapi::ba_studies_table(con = brap, studyDbId = input$location)$studyName))
+})
+
 
  output$crossPointer <- renderText({
    validate(
@@ -339,24 +344,39 @@ observeEvent(input$selectCol_scatter, {
  })
 
   
+  # Add the renderText for dataSourceText
+  output$dataSourceText <- renderText({
+    dataSource()
+  })
+
+  
   
   ## Flowering  ------
 
-  inventory_init <- eventReactive(input$brapipull, withProgress(message = "Pulling Inventory Data", {{ inven <- data.frame(brapi::ba_studies_table(con = brap, studyDbId = reactive_iid(), rclass="data.frame")) %>%
-    filter(observationLevel == "plant") %>% # select just plant rows
-    set_names(~(.)%>% str_replace_all("SUGARCANE.*","") %>% str_replace_all("\\.","")) %>%  # take CO term out of colnames
-    filter(FloweringTime== reactive_date()) %>% 
-    select(germplasmName, germplasmDbId, SexMFWM) %>% 
-    group_by(germplasmName, germplasmDbId, SexMFWM) %>% 
-    summarise(count = n()) %>%
-    rename(Clone = germplasmName, FloweringCount = count, Sex = SexMFWM) }}))
-
-  output$inventoryTable <- ({
-    renderDT(inventory_init()[,-which(colnames(inventory_init())=="germplasmDbId")], options = list(language = list(
-      zeroRecords = "There are no records to display. Double check the date you selected and try again. 
-    You may need to wait a few minutes if inventory records were recently uploaded"
-    )))
+  inventory_init <- eventReactive(input$brapipull, withProgress(message = "Pulling Inventory Data", {
+  tryCatch({
+    inven <- data.frame(brapi::ba_studies_table(con = brap, studyDbId = reactive_iid(), rclass="data.frame")) %>%
+      filter(observationLevel == "plant") %>% # select just plant rows
+      set_names(~(.)%>% str_replace_all("SUGARCANE.*","") %>% str_replace_all("\\.","")) %>%  # take CO term out of colnames
+      filter(FloweringTime== reactive_date()) %>% 
+      select(germplasmName, germplasmDbId, SexMFWM) %>% 
+      group_by(germplasmName, germplasmDbId, SexMFWM) %>% 
+      summarise(count = n()) %>%
+      rename(Clone = germplasmName, FloweringCount = count, Sex = SexMFWM)
+    dataSource("Data pulled from BrAPI")
+    inven
+  }, error = function(e) {
+    dataSource("Saved data is being rendered")
+    data.frame(Clone = character(), FloweringCount = numeric(), Sex = character()) # Return an empty data frame with the expected columns
   })
+}))
+
+output$inventoryTable <- ({
+  renderDT(inventory_init()[,-which(colnames(inventory_init())=="germplasmDbId")], options = list(language = list(
+    zeroRecords = "There are no records to display. Double check the date you selected and try again. 
+    You may need to wait a few minutes if inventory records were recently uploaded"
+  )))
+})
   
   # take the away for now
   # , editable=list(target="column", disable=list(columns=c(0:2)))
