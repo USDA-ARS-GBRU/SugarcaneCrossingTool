@@ -57,3 +57,60 @@ InitCrossTable <- function(cross_list, Female.Parent = "Female.Parent", Male.Par
   }
 }
 
+
+createPedigreeGraph <- function(data) {
+
+  
+  if (nrow(data) > 0 && !data$pedigreeString[1]=="///") {
+      
+      # Create a data frame for nodes
+      nodes <- data.frame(
+        id = data$germplasmName,
+        stringsAsFactors = FALSE)
+      
+      
+      # Create a data frame for edges
+      
+      edges_male<-data.frame(matrix(NA, nrow=dim(data)[2]), ncol=5)
+      edges_female<-data.frame(matrix(NA, nrow=dim(data)[2]), ncol=5)
+      
+    
+      
+      for(i in 1:dim(data)[1]){
+        
+        if (!dim(data[i,"parents"][[1]])[1]==0) {
+          edges_female[i,1]<-data[i,"parents"][[1]]$germplasmName[1]
+          edges_male[i,1]<-data[i,"parents"][[1]]$germplasmName[2]
+          edges_female[i,2]<-edges_male[i,2]<-data[i, "germplasmName"]
+          edges_female[i,3]<-edges_male[i,3]<-"to"
+          edges_female[i,4]<-edges_male[i,4]<-FALSE
+          edges_female[i,5]<-"red"
+          edges_male[i,5]<-"blue"
+
+        } 
+        
+      }
+        edges<-rbind(edges_female, edges_male)
+        colnames(edges)<-c("from", "to", "arrows", "stringsAsFactors", "color")
+        edges<-edges[!is.na(edges$from),]
+      
+  
+      # Create a visNetwork graph
+      graph <- visNetwork(nodes, edges) %>%
+        visNodes(shape = "dot", size = 20, font = list(size = 12)) %>%
+        visEdges(arrows = "to") %>%
+        visLayout(randomSeed = 123) %>%
+        visOptions(highlightNearest = list(enabled = TRUE, degree = 1))
+      
+     
+      return(graph)
+      
+    } else {
+      print("Error: No data or missing pedigree for the selected clone")
+      return(NULL)
+     } 
+}
+
+
+
+

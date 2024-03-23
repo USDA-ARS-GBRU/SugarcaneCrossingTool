@@ -198,8 +198,8 @@
       "RemoteRepo": "cip-riu-brapi",
       "RemoteUsername": "keocorak",
       "RemoteRef": "HEAD",
-      "RemoteSha": "3f6e7d8eb56ac900756389494234a2a33637c250",
-      "Hash": "de7987eb35c7348e97e19bc45d884a89",
+      "RemoteSha": "3953207df538fd58cbf5badabf36777f815d99d4",
+      "Hash": "ad7b16a7f99e16ecb43c58ead3f31e87",
       "Requirements": [
         "assertthat",
         "curl",
@@ -429,10 +429,10 @@
     },
     "curl": {
       "Package": "curl",
-      "Version": "5.2.0",
+      "Version": "5.2.1",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "ce88d13c0b10fe88a37d9c59dba2d7f9",
+      "Hash": "411ca2c03b1ce5f548345d2fc2685f7a",
       "Requirements": []
     },
     "data.table": {
@@ -918,6 +918,23 @@
         "uuid"
       ]
     },
+    "igraph": {
+      "Package": "igraph",
+      "Version": "2.0.3",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "c3b7d801d722e26e4cd888e042bf9af5",
+      "Requirements": [
+        "Matrix",
+        "cli",
+        "cpp11",
+        "lifecycle",
+        "magrittr",
+        "pkgconfig",
+        "rlang",
+        "vctrs"
+      ]
+    },
     "isoband": {
       "Package": "isoband",
       "Version": "0.2.7",
@@ -1086,6 +1103,18 @@
       "Hash": "6dfe8bf774944bd5595785e3229d8771",
       "Requirements": [
         "colorspace"
+      ]
+    },
+    "networkD3": {
+      "Package": "networkD3",
+      "Version": "0.4",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "38310ec4ddb1398359abdd603c151067",
+      "Requirements": [
+        "htmlwidgets",
+        "igraph",
+        "magrittr"
       ]
     },
     "nlme": {

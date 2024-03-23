@@ -388,9 +388,6 @@ output$inventoryTable <- ({
 
     germplasm<-germplasm[duplicated(germplasm$Clone)==FALSE,]
 
-    # Debugging statements
-  print("Germplasm data:")
-  print(germplasm)
 
   tmp <- stripClass(
     as.data.frame(
@@ -399,25 +396,9 @@ output$inventoryTable <- ({
     classString = "ba_germplasm_details"
   )
 
-  # Debugging statements
-  print("Germplasm details data:")
-  print(head(tmp))
-
   pedigree <- tmp[tmp$data.germplasmName %in% germplasm$Clone, c("data.germplasmName", "data.germplasmDbId", "data.pedigree")] %>%
     rename(Clone = data.germplasmName, Pedigree = data.pedigree)
 
-  # Debugging statements
-  print("Pedigree data:")
-  print(head(pedigree))
-
-
-    selectedClone <- reactiveVal()
-    tmp <- stripClass(
-      as.data.frame(
-        ba_germplasm_details2(con = brap2, germplasmQuery = as.character(paste0("?studyDbId=", reactive_iid(), "&pageSize=1000")), rclass = "data.frame")
-      ),
-      classString = "ba_germplasm_details"
-    )
     # hacked ba_germplasm_details2 to get details for the entire study, then filtered with code below
     # oh, could have used ba_germplasm_details_study.... oh well
 
@@ -433,6 +414,21 @@ output$inventoryTable <- ({
     colnames(pedigree)[4] <- "Number.Progeny"
 
     pedigree[, -which(colnames(pedigree) == "data.germplasmDbId")] }}))
+  
+  
+  #when selected code is changed, update api call to get pedigree
+  
+  deeppedigree_init <- eventReactive(input$selectedClone, {{ germplasm <- as.data.frame(inventory_init())
+
+    germplasm <- germplasm[duplicated(germplasm$Clone) == FALSE, ]
+
+    tmp <- jsonlite::fromJSON(ba_germplasm_pedigree(con = brap2, germplasmDbId = as.character(germplasm[which(germplasm$Clone == input$selectedClone ), 2]), rclass = "json"))$result$data
+
+    return(tmp) }})
+  
+
+  
+  
 
     pedmatrix_init <- eventReactive(input$makepedigree, {{ germplasm <<- as.data.frame(inventory_init())
   
@@ -461,87 +457,24 @@ output$inventoryTable <- ({
     )))
   }) # this merge fufills user request to see similarity to LCP85-
 
-output$cloneDropdown <- renderUI({
+  
+#third tab stuff
+  selectedClone <- reactiveVal()
+
+  output$cloneDropdown <- renderUI({
   selectInput("selectedClone", "Select a Clone", choices = unique(pedigree_init()$Clone))
 })
 
-# Install and load the visNetwork package
-
-
-createPedigreeGraph <- function(data, selectedClone) {
-  subset_data <- data[data$Clone == selectedClone, ]
-
-  # Print debugging information
-  print("Selected clone data:")
-  print(subset_data)
-
-  if (nrow(subset_data) > 0 && !is.na(subset_data$Pedigree[1])) {
-    # Split the pedigree string into components
-    parents <- strsplit(subset_data$Pedigree, "/")[[1]]
-    
-    if (length(parents) >= 2) {
-      female_parent <- parents[1]
-      male_parent <- parents[2]
-
-      # Create a data frame for nodes
-      nodes <- data.frame(
-        id = c(selectedClone, female_parent, male_parent),
-        label = c(selectedClone, female_parent, male_parent),
-        group = c("Child", "Female", "Male"),
-        value = c(1, 1, 1),
-        color = c("yellow", "red", "blue"),
-        stringsAsFactors = FALSE
-      )
-
-      # Create a data frame for edges
-      edges <- data.frame(
-        from = c(female_parent, male_parent),
-        to = c(selectedClone, selectedClone),
-        arrows = "to",
-        stringsAsFactors = FALSE
-      )
-
-      # Create a visNetwork graph
-      graph <- visNetwork(nodes, edges) %>%
-        visNodes(shape = "dot", size = 20, font = list(size = 12)) %>%
-        visEdges(arrows = "to") %>%
-        visLayout(randomSeed = 123) %>%
-        visOptions(highlightNearest = list(enabled = TRUE, degree = 1))
-
-      # Print debugging information
-      print("Graph created:")
-      print(graph)
-
-      return(graph)
-    } else {
-      print("Error: Insufficient parents in the pedigree data")
-      return(NULL)
-    }
-  } else {
-    print("Error: No data or missing pedigree for the selected clone")
-    return(NULL)
-  }
-}
 
 output$pedigreeGraph <- renderVisNetwork({
   req(input$selectedClone)
 
-  pedigree_data_val <- pedigree_init()
-
-  # Print debugging information
-  print("Selected clone:")
-  print(input$selectedClone)
-
-  print("Pedigree data:")
-  print(pedigree_data_val)
+  pedigree_data_val <<- deeppedigree_init()
 
   if (!is.null(pedigree_data_val) && nrow(pedigree_data_val) > 0) {
-    graph <- createPedigreeGraph(pedigree_data_val, input$selectedClone)
+    graph <- createPedigreeGraph(pedigree_data_val)
 
-    # Print debugging information
-    print("Graph:")
-    print(graph)
-
+  
     if (!is.null(graph)) {
       return(graph)
     } else {
@@ -551,11 +484,6 @@ output$pedigreeGraph <- renderVisNetwork({
     return(NULL)
   }
 })
-
-
-
-
-
 
 
 output$pedigreeMatrix <- renderPlotly({
