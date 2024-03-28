@@ -60,7 +60,7 @@ ui <- dashboardPage(
 
 ## SIDEBAR ------
 sidebar = dashboardSidebar(
-  selectInput("location", "Select Location:", choices = c("Florida" = "3654", "Louisiana" = "3678")),
+  selectInput("location", "Select Location:", choices = location_iid_map),
   textInput("crossesid", "Login with your CID:", value=""),
   
   dateInput(
@@ -331,7 +331,7 @@ observeEvent(input$selectCol_scatter, {
   # point to current study
   
  output$inventoryPointer <- renderText({
-  location <- ifelse(input$location == "3654", "Florida", "Louisiana")
+  location <- names(location_iid_map)[location_iid_map == input$location]
   paste("Location:", location, "-", unique(brapi::ba_studies_table(con = brap, studyDbId = input$location)$studyName))
 })
 

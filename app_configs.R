@@ -4,6 +4,11 @@ historical_crosses<-read.csv("data/demo_historicalcrosses.csv") #needs to be upd
 
 ## INIT DB CONNECTION ----------------------
 
+location_iid_map <- list(
+  "Florida" = "3654",
+  "Louisiana" = "3678"
+)
+
 brap <- brapi::as.ba_db(
   secure = FALSE,
   protocol = "https://",
