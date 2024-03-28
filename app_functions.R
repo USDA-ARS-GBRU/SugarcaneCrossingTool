@@ -58,10 +58,10 @@ createPedigreeGraph <- function(data) {
     
     # Create an empty data frame for edges
     edges <- data.frame(
-      from = character(),
-      to = character(),
-      arrows = "to",
-      color = "gray",
+      from = NULL,
+      to = NULL,
+      arrows = NULL,
+      color = NULL,
       stringsAsFactors = FALSE
     )
     
@@ -104,7 +104,7 @@ createPedigreeGraph <- function(data) {
         arrows = "to",
         color = list(color = "gray", highlight = "red")
       ) %>%
-      visHierarchicalLayout(direction = "UD", levelSeparation = 150) %>%
+      visHierarchicalLayout(direction = "UD", sortMethod = "directed") %>%
       visOptions(highlightNearest = list(enabled = TRUE, degree = 1))
     
     return(graph)
