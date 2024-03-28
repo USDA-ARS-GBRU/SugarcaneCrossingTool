@@ -44,36 +44,69 @@ InitCrossTable <- function(cross_list, Female.Parent = "Female.Parent", Male.Par
   }
 }
 
+
 createPedigreeGraph <- function(data) {
   if (!is.null(data) && nrow(data) > 0) {
     # Create a data frame for nodes
     nodes <- data.frame(
       id = data$germplasmDbId,
       label = data$germplasmName,
-      group = ifelse(data$parentType == "FEMALE", "Female", ifelse(data$parentType == "MALE", "Male", "Child")),
-      value = 1,
-      color = ifelse(data$parentType == "FEMALE", "red", ifelse(data$parentType == "MALE", "blue", "yellow")),
+      color = ifelse(data$germplasmDbId %in% unique(unlist(lapply(data$parents, function(x) x$germplasmDbId))), ifelse(data$germplasmDbId %in% unique(unlist(lapply(data$parents, function(x) x$germplasmDbId[x$parentType == "FEMALE"]))), "red", "blue"), "purple"),
+      shape = "dot",
       stringsAsFactors = FALSE
     )
-
-    # Create a data frame for edges
+    
+    # Create an empty data frame for edges
     edges <- data.frame(
-      from = data$parentDbId,
-      to = data$germplasmDbId,
+      from = character(),
+      to = character(),
       arrows = "to",
+      color = "gray",
       stringsAsFactors = FALSE
     )
-
-    # Remove rows with missing 'from' values
-    edges <- edges[!is.na(edges$from), ]
-
+    
+    # Iterate over each row in the data
+    for (i in 1:nrow(data)) {
+      # Extract the parent information for the current germplasm
+      parents <- data$parents[[i]]
+      
+      # Skip iteration if parents is an empty data frame
+      if (is.data.frame(parents) && nrow(parents) == 0) {
+        next
+      }
+      
+      if (!is.null(parents) && nrow(parents) > 0) {
+        # Filter out parents with missing germplasmDbId
+        valid_parents <- parents[!is.na(parents$germplasmDbId) & parents$germplasmDbId != "", ]
+        
+        if (nrow(valid_parents) > 0) {
+          # Add edges for each valid parent
+          edges <- rbind(edges, data.frame(
+            from = valid_parents$germplasmDbId,
+            to = data$germplasmDbId[i],
+            arrows = "to",
+            color = "gray",
+            stringsAsFactors = FALSE
+          ))
+        }
+      }
+    }
+    
     # Create a visNetwork graph
     graph <- visNetwork(nodes, edges) %>%
-      visNodes(shape = "dot", size = 20, font = list(size = 12)) %>%
-      visEdges(arrows = "to") %>%
-      visLayout(randomSeed = 123) %>%
+      visNodes(
+        shape = "dot",
+        size = 20,
+        font = list(size = 12),
+        color = list(background = "color", border = "black", highlight = "yellow")
+      ) %>%
+      visEdges(
+        arrows = "to",
+        color = list(color = "gray", highlight = "red")
+      ) %>%
+      visHierarchicalLayout(direction = "UD", levelSeparation = 150) %>%
       visOptions(highlightNearest = list(enabled = TRUE, degree = 1))
-
+    
     return(graph)
   } else {
     return(NULL)

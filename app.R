@@ -418,13 +418,17 @@ output$inventoryTable <- ({
   
   #when selected code is changed, update api call to get pedigree
   
-  deeppedigree_init <- eventReactive(input$selectedClone, {{ germplasm <- as.data.frame(inventory_init())
+  deeppedigree_init <- eventReactive(input$selectedClone, {
+  germplasm <- as.data.frame(inventory_init())
+  germplasm <- germplasm[duplicated(germplasm$Clone) == FALSE, ]
 
-    germplasm <- germplasm[duplicated(germplasm$Clone) == FALSE, ]
+  tmp <- jsonlite::fromJSON(ba_germplasm_pedigree(con = brap2, germplasmDbId = as.character(germplasm[which(germplasm$Clone == input$selectedClone ), 2]), rclass = "json"))$result$data
 
-    tmp <- jsonlite::fromJSON(ba_germplasm_pedigree(con = brap2, germplasmDbId = as.character(germplasm[which(germplasm$Clone == input$selectedClone ), 2]), rclass = "json"))$result$data
+  print("Structure of tmp:")
+  print(str(tmp))
 
-    return(tmp) }})
+  return(tmp)
+})
   
 
   
