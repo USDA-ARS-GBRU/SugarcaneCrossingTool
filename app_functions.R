@@ -51,10 +51,13 @@ createPedigreeGraph <- function(data) {
     nodes <- data.frame(
       id = data$germplasmDbId,
       label = data$germplasmName,
-      color = ifelse(data$germplasmDbId %in% unique(unlist(lapply(data$parents, function(x) x$germplasmDbId))), ifelse(data$germplasmDbId %in% unique(unlist(lapply(data$parents, function(x) x$germplasmDbId[x$parentType == "FEMALE"]))), "red", "blue"), "purple"),
+      color = ifelse(data$germplasmDbId %in% unique(unlist(lapply(data$parents, function(x) x$germplasmDbId))), "lightblue", "purple"),
       shape = "dot",
       stringsAsFactors = FALSE
     )
+    
+    # Remove rows with NA values from nodes
+    nodes <- nodes[!is.na(nodes$id), ]
     
     # Create an empty data frame for edges
     edges <- data.frame(
@@ -80,29 +83,45 @@ createPedigreeGraph <- function(data) {
         valid_parents <- parents[!is.na(parents$germplasmDbId) & parents$germplasmDbId != "", ]
         
         if (nrow(valid_parents) > 0) {
-          # Add edges for each valid parent
+          # Add edges for each valid parent with colors based on parent type
           edges <- rbind(edges, data.frame(
             from = valid_parents$germplasmDbId,
             to = data$germplasmDbId[i],
             arrows = "to",
-            color = "gray",
+            color = ifelse(valid_parents$parentType == "MALE", "blue", "red"),
             stringsAsFactors = FALSE
           ))
         }
       }
     }
     
+    # Remove rows with NA values from edges
+    edges <- edges[!is.na(edges$from) & !is.na(edges$to), ]
+    
+    # Count the number of outgoing edges for each node
+    node_contributions <- table(edges$from)
+    
+    # Update the size of nodes based on their contributions
+    nodes$size <- 20  # Default size for nodes with no outgoing edges
+    
+    # Create a mapping of node IDs to their contributions
+    node_contribution_map <- setNames(as.integer(node_contributions), names(node_contributions))
+    
+    # Update the size of nodes based on their contributions, handling NA values
+    valid_node_ids <- intersect(nodes$id, names(node_contribution_map))
+    nodes$size[nodes$id %in% valid_node_ids] <- 20 + 5 * node_contribution_map[valid_node_ids]
+    
     # Create a visNetwork graph
     graph <- visNetwork(nodes, edges) %>%
       visNodes(
         shape = "dot",
-        size = 20,
         font = list(size = 12),
-        color = list(background = "color", border = "black", highlight = "yellow")
+        color = list(background = "color", border = "black", highlight = "yellow"),
+        size = nodes$size  # Set the node sizes directly in visNodes
       ) %>%
       visEdges(
         arrows = "to",
-        color = list(color = "gray", highlight = "red")
+        color = list(color = "color", highlight = "red")
       ) %>%
       visHierarchicalLayout(direction = "UD", sortMethod = "directed") %>%
       visOptions(highlightNearest = list(enabled = TRUE, degree = 1))
