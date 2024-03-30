@@ -45,7 +45,7 @@ InitCrossTable <- function(cross_list, Female.Parent = "Female.Parent", Male.Par
 }
 
 
-createPedigreeGraph <- function(data) {
+createPedigreeGraph <- function(data, selected_clone_id = NULL) {
   if (!is.null(data) && nrow(data) > 0) {
     # Create a data frame for nodes
     nodes <- data.frame(
@@ -58,6 +58,12 @@ createPedigreeGraph <- function(data) {
     
     # Remove rows with NA values from nodes
     nodes <- nodes[!is.na(nodes$id), ]
+    
+    # Check if selected_clone_id is provided and exists in nodes$id
+    if (!is.null(selected_clone_id) && selected_clone_id %in% nodes$id) {
+      # Color the selected clone node differently
+      nodes$color[nodes$id == selected_clone_id] <- "orange"
+    }
     
     # Create an empty data frame for edges
     edges <- data.frame(
