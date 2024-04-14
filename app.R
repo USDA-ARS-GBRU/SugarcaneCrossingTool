@@ -343,7 +343,7 @@ server <- function(input, output, session) {
   # Call the server functions from separate files
   inventory_init <- flowering_server(input, output, session, reactive_date, reactive_iid, dataSource)
   pedigree_server(input, output, session, reactive_iid, selectedClone, inventory_init)
-  performance_server(input, output, session, reactive_iid, rv, rv_trait_scatter)
+  performance_server(input, output, session, reactive_iid, rv, rv_trait_scatter, inventory_init)
   crosses_server(input, output, session, reactive_iid, reactive_cid)
   download_page_server(input, output, session, reactive_date)
   

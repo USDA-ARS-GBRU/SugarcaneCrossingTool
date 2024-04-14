@@ -1,8 +1,8 @@
 #Performance.R
-performance_server <- function(input, output, session, reactive_iid, rv, rv_trait_scatter) {
-performance_init <- eventReactive(input$makeperformance, withProgress(message = "Pulling Performance Data", {
-  germplasm <- as.data.frame(inventory_init())
-  germplasm <- germplasm[duplicated(germplasm$Clone) == FALSE,]
+performance_server <- function(input, output, session, reactive_iid, rv, rv_trait_scatter, inventory_init) {
+  performance_init <- eventReactive(input$makeperformance, withProgress(message = "Pulling Performance Data", {
+    germplasm <- as.data.frame(inventory_init())
+    germplasm <- germplasm[duplicated(germplasm$Clone) == FALSE,]
 
   # pull phenotype data for each item in inventory table ('germplasm')
   tmp <- lapply(germplasm$germplasmDbId, function(dbId) {
