@@ -35,11 +35,11 @@ tags$head(
 # Source custom functions and configurations from separate files
 source("app_functions.R")
 source("app_configs.R")
-source("Flowering.R")
-source("Pedigree.R")
-source("performance.R")
-source("crosses.R")
-source("download_page.R")
+source("modules/flowering.R")
+source("modules/pedigree.R")
+source("modules/performance.R")
+source("modules/crosses.R")
+source("modules/download_page.R")
 
 
 ## THEME
@@ -70,7 +70,8 @@ ui <- dashboardPage(
     
     dateInput(
       "date",
-      "Choose A Date:"
+      "Choose A Date:",
+      value = "2023-10-30"
     ),
     
     p("for testing, select:", strong("October 10, 2023")),
@@ -116,24 +117,16 @@ ui <- dashboardPage(
       ### Home content ----
       tabItem(
         tabName = "home",
+        
         h1("USDA Sugarcane Crossing Tool"),
-        p("Welcome to STracT, the Sugarcane crossing tool! This tool lets you 
-           see data and generate reports for all of the 
-          clones that are flowering on a specific day."),
-        h4("Here are instructions on how to use this tool."),
-        p("1. Choose a date from the calendar on the 
-          left for the day you want to see"),
-        p(
-          "2. Click 'Get Flower Inventory Data' to pull in data from",
-          a(href = "https://sugarcanebase.breedinginsight.net/", "SugarcaneBase"),
-          ". This will show you an inventory list of flowering clones in the 'Flowering' tab to the left"
-        ),
-        p("3. Next, you can click on any of the other tabs to see their associated data"),
-        p("4. You can also download a report using the 'Download' tab."),
-        h4("Note, you've logged in to view inventory for these can lines: "),
+        p("Welcome to STracT, the Sugarcane crossing tool! Click", a(href="https://github.com/keocorak/XingAppV2", "here"), "for instructions."),
+        p("Placeholder for image"),
+        
+        p("Testing and debugging stuff below:"),
+        p("Note, you've logged in to view inventory for these can lines: "),
         textOutput("inventoryPointer"),
         
-        h4("Note, you've logged in to track this crossing experiment: "),
+        p("Note, you've logged in to track this crossing experiment: "),
         textOutput("crossPointer")
       ),
 
