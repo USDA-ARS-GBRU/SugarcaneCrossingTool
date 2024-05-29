@@ -358,7 +358,7 @@ server <- function(input, output, session) {
       need(input$crossesid != "", "Please chose a breeder login:")
     )
     crosses <- names(crosses_block_iid_map)[crosses_block_iid_map == input$crossesid]
-    paste("Breeder:", crosses, "-", unique(ba_crosses_study(con = brap2, crossingProjectDbId = as.character(input$crossesid), rclass = "data.frame")$data.crossingProjectName[[1]])) #crossing project name has a breedbase bug- should return text, not number
+    paste("Breeder:", crosses, "-", unique(ba_crosses_study(con = brap2, crossingProjectDbId = input$crossesid, rclass = "data.frame")$data.crossingProjectName[[1]])) #crossing project name has a breedbase bug- should return text, not number
     
     
   })

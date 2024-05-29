@@ -1,5 +1,5 @@
 #Crosses.R
-crosses_server <- function(input, output, session, reactive_iid, reactive_cid) {
+crosses_server <- function(input, output, session, reactive_cid, inventory_init) {
 # Event reactive that triggers when the "makecrosses" input is clicked
 crosses_init <- eventReactive(input$makecrosses, withProgress(message = "Pulling Cross Data", {{
     # Filter the inventory data to get unique clones
