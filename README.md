@@ -1,16 +1,14 @@
 
-**Sugarcane Crossing Tool**
+**Sugarcane Crossing Tool  (SCT)**
 
 -----------------------------------
 
-**Sugarcane Crossing Tool (SCT)** 
-
-**For Users/Breeders Logging into the App** 
+**For Breeders Logging into the App** 
 
 1. Open the SCT application in your web browser. 
-1. On the left sidebar, select your location from the "Select Location" dropdown menu. 
-1. Enter your CID (Crossing ID) in the "Login with your CID" text input field. 
-1. Choose a date from the calendar for which you want to view the flowering inventory data. 
+2. On the left sidebar, select your location from the "Select Location" dropdown menu. 
+3. Also select your name from the "Select Breeder" dropdown menu on the left sidebar.
+4. Choose a date from the calendar for which you want to view the flowering inventory data. 
 
 **Using the App** 
 
@@ -30,28 +28,42 @@ Note: Make sure to click the "Get Flower Inventory Data" button each time you ch
 
 **Connection to a Breedbase instance**
 
-Create or open the .Renviron file in your home directory
+In order to run the app locally, create or open a .Renviron file in your home directory
 
 ```
 cd ~
 touch .Renviron
 ```
 
-Then add the following three lines to the .Renviron file, replaced the text in quotes with your username and password
+Then add the following three lines to the .Renviron file, replaced the text in quotes with your URL, username, and password
 
 ```
 URL="yourbreedbaseurl"
 USER="yourbreedbaseusername"
 PASSWORD="yourbreedbasepassword"
 ```
+**Setting up the app_config.R file**
+
+(work in progress)
+
+As provide, the SCT application expects a config file specifing:
+
+- **trialDbIds**
+  - for crossing block trials as a named list in 'location_iid_map'
+  - for crossing experiments as a named list in 'crosses_iid_map'
+- **database connections** using as.ba\_db() (see below)
+- **pedigree** and **historical cross** files downloaded from BreedBase
+  - because these files are large and static, they are shipped with the app instead of being pulled each time
+
+Example files are provided.
 
 **Implementation with BrAPI Library** 
 
-The SCT application utilizes the BrAPI library in R to interact with the BrAPI (Breeding API) database. The BrAPI library provides functions to connect to the database, retrieve data, and perform various operations. 
+The SCT application utilizes the brapi library in R to interact with a BreedBase database. The brapi library provides functions to connect to the database, retrieve data, and perform various operations. 
 
-To establish a connection to the BrAPI database, the as.ba\_db() function from the BrAPI library is used. The connection details, such as the database URL, user credentials, and other parameters, are specified in the app\_configs.R file. 
+To establish a connection to the database, the as.ba\_db() function from the brapi library is used. The connection details, such as the database URL, user credentials, and other parameters, are specified in the app\_configs.R file. 
 
-The app makes use of several BrAPI functions to retrieve data from the database, such as ba\_studies\_table(), ba\_germplasm\_details2(), ba\_germplasm\_progeny(), ba\_phenotypes\_search(), and ba\_crosses\_study(). These functions are called within the app to fetch the required data based on user inputs and selections. 
+The app makes use of several brapi functions to retrieve data from the database, such as ba\_studies\_table(), ba\_germplasm\_details2(), ba\_germplasm\_progeny(), ba\_phenotypes\_search(), and ba\_crosses\_study(). These functions are called within the app to fetch the required data based on user inputs and selections. 
 
 **Code Structure** 
 
