@@ -3,9 +3,6 @@
 
 -----------------------------------
 
-**Demo site here (no login):** 
-https://keocorak.shinyapps.io/SCT/
-
 **Sugarcane Crossing Tool (SCT)** 
 
 **For Users/Breeders Logging into the App** 
