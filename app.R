@@ -9,7 +9,6 @@ library(brapi)
 library(tidyverse)
 library(shiny)
 library(bs4Dash)
-#library(brapirv1)
 library(DT)
 library(rjson)
 library(reshape2)
@@ -51,7 +50,7 @@ brapi::ba_check(brap) # should be true, for debugging
 # USER INTERFACE  -------------------------------------------------------------
 
 ui <- dashboardPage(
-  title = "STracT",
+  title = "STC",
 
   ## CONTROLBAR ----
   controlbar = dashboardControlbar(
@@ -61,17 +60,20 @@ ui <- dashboardPage(
   ),
 
   ## HEADER --------
-  header = dashboardHeader(title = "Sugarcane Crossing Tool"),
+  header = dashboardHeader(title = "SCT"),
 
   ## SIDEBAR ------
   sidebar = dashboardSidebar(
     selectInput("location", "Select Location:", choices = location_iid_map),
-    textInput("crossesid", "Login with your CID:", value=""),
+    
+    #this is kind of confusing. The idea is that multiple breeders might be working at same location (Florida) and they should be able to track crosses independently, even though cane lines are combined
+    #so crossesid refers to crosses a specific breeder is making
+    selectInput("crossesid", "Select Breeder", choices=crosses_block_iid_map), 
     
     dateInput(
       "date",
       "Choose A Date:",
-      value = "2023-10-30"
+      value = "2023-10-10"
     ),
     
     p("for testing, select:", strong("October 10, 2023")),
@@ -118,15 +120,19 @@ ui <- dashboardPage(
       tabItem(
         tabName = "home",
         
-        h1("USDA Sugarcane Crossing Tool"),
-        p("Welcome to STracT, the Sugarcane crossing tool! Click", a(href="https://github.com/keocorak/XingAppV2", "here"), "for instructions."),
-        p("Placeholder for image"),
+        h1("Sugarcane Integrated Breeding System (SIBS) Sugarcane Crossing Tool (SCT)"),
+        p("Welcome SCT! Click", a(href="https://github.com/USDA-ARS-GBRU/SugarcaneCrossingTool", "here"), "for instructions."),
+       
+        h1("Login information"),
         
-        p("Testing and debugging stuff below:"),
-        p("Note, you've logged in to view inventory for these can lines: "),
+        p("You've logged in to view inventory for this location: "),
+        
         textOutput("inventoryPointer"),
         
-        p("Note, you've logged in to track this crossing experiment: "),
+        br(),
+        
+        p("You've logged in as:"),
+        
         textOutput("crossPointer")
       ),
 
@@ -326,7 +332,7 @@ server <- function(input, output, session) {
   })
   
   # Reactive value for selected cross ID
-  reactive_cid <- reactive({input$crossesid})
+  reactive_cid <- reactive({as.character(input$crossesid)})
   
   # Add the renderText for dataSourceText
   output$dataSourceText <- renderText({
@@ -337,7 +343,7 @@ server <- function(input, output, session) {
   inventory_init <- flowering_server(input, output, session, reactive_date, reactive_iid, dataSource)
   pedigree_server(input, output, session, reactive_iid, selectedClone, inventory_init)
   performance_server(input, output, session, reactive_iid, rv, rv_trait_scatter, inventory_init)
-  crosses_server(input, output, session, reactive_iid, reactive_cid)
+  crosses_server(input, output, session, reactive_cid, inventory_init)
   download_page_server(input, output, session, reactive_date)
   
   # Output for inventory pointer
@@ -349,9 +355,12 @@ server <- function(input, output, session) {
   # Output for cross pointer
   output$crossPointer <- renderText({
     validate(
-      need(input$crossesid != "", "Please log in with your CID")
+      need(input$crossesid != "", "Please chose a breeder login:")
     )
-    unique(ba_crosses_study(con = brap2, crossingProjectDbId = as.character(input$crossesid), rclass = "data.frame")$data.crossingProjectName[[1]])
+    crosses <- names(crosses_block_iid_map)[crosses_block_iid_map == input$crossesid]
+    paste("Breeder:", crosses, "-", unique(ba_crosses_study(con = brap2, crossingProjectDbId = as.character(input$crossesid), rclass = "data.frame")$data.crossingProjectName[[1]])) #crossing project name has a breedbase bug- should return text, not number
+    
+    
   })
 }
 

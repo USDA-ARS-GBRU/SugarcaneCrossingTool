@@ -9,6 +9,10 @@ location_iid_map <- list(
   "Louisiana" = "3678"
 )
 
+crosses_block_iid_map<-list(
+  "DemoBreeder"="219"
+)
+
 brap <- brapi::as.ba_db(
   secure = FALSE,
   protocol = "https://",
@@ -46,17 +50,17 @@ brap2 <- brapi::as.ba_db(
 
 
 #For debugging --> 
-
-inven <- data.frame(brapi::ba_studies_table(con = brap, studyDbId = "3654", rclass="data.frame")) %>%
-  filter(observationLevel == "plant") %>% # select just plant rows
-  set_names(~(.)%>% str_replace_all("SUGARCANE.*","") %>% str_replace_all("\\.","")) %>%
-  filter(FloweringTime=="2023-10-10") %>%
-  #filter(FloweringTime== reactive_date()) %>%
-  select(germplasmName, germplasmDbId, SexMFWM) %>%
-  group_by(germplasmName, germplasmDbId, SexMFWM) %>%
-  summarise(count = n()) %>%
-  rename(Clone = germplasmName, FloweringCount = count, Sex = SexMFWM)
-
+# 
+# inven <- data.frame(brapi::ba_studies_table(con = brap, studyDbId = "3654", rclass="data.frame")) %>%
+#   filter(observationLevel == "plant") %>% # select just plant rows
+#   set_names(~(.)%>% str_replace_all("SUGARCANE.*","") %>% str_replace_all("\\.","")) %>%
+#   filter(FloweringTime=="2023-10-10") %>%
+#   #filter(FloweringTime== reactive_date()) %>%
+#   select(germplasmName, germplasmDbId, SexMFWM) %>%
+#   group_by(germplasmName, germplasmDbId, SexMFWM) %>%
+#   summarise(count = n()) %>%
+#   rename(Clone = germplasmName, FloweringCount = count, Sex = SexMFWM)
+# 
 
 #run once
 
