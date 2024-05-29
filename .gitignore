@@ -9,3 +9,5 @@ testdata/
 XingAppV2.Rproj
 debugging.R
 .Rapp.history
+test.R
+.gitignore
