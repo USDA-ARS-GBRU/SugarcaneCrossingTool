@@ -28,18 +28,19 @@ Note: Make sure to click the "Get Flower Inventory Data" button each time you ch
 
 **For Developers** 
 
-**Connection to a BrAPI-compliant database like Breedbase**
+**Connection to a Breedbase instance**
 
-Create a .Renviron file in your working directory
+Create or open the .Renviron file in your home directory
 
 ```
-cd /path/to/working/directory
+cd ~
 touch .Renviron
 ```
 
-Then add the following two lines to the .Renviron file, replaced the text in quotes with your username and password
+Then add the following three lines to the .Renviron file, replaced the text in quotes with your username and password
 
 ```
+URL="yourbreedbaseurl"
 USER="yourbreedbaseusername"
 PASSWORD="yourbreedbasepassword"
 ```
