@@ -4,13 +4,13 @@
 -----------------------------------
 
 **Demo site here (no login):** 
-https://keocorak.shinyapps.io/STract/
+https://keocorak.shinyapps.io/SCT/
 
-**STracT (Sugarcane Crossing Tool)** 
+**Sugarcane Crossing Tool (SCT)** 
 
 **For Users/Breeders Logging into the App** 
 
-1. Open the STracT application in your web browser. 
+1. Open the SCT application in your web browser. 
 1. On the left sidebar, select your location from the "Select Location" dropdown menu. 
 1. Enter your CID (Crossing ID) in the "Login with your CID" text input field. 
 1. Choose a date from the calendar for which you want to view the flowering inventory data. 
@@ -31,17 +31,33 @@ Note: Make sure to click the "Get Flower Inventory Data" button each time you ch
 
 **For Developers** 
 
-**Implementation with brapi Library** 
+**Connection to a BrAPI-compliant database like Breedbase**
 
-The STracT application utilizes the brapi library in R to interact with the BrAPI (Breeding API) database. The brapi library provides functions to connect to the database, retrieve data, and perform various operations. 
+Create a .Renviron file in your working directory
 
-To establish a connection to the BrAPI database, the as.ba\_db() function from the brapi library is used. The connection details, such as the database URL, user credentials, and other parameters, are specified in the app\_configs.R file. 
+```
+cd /path/to/working/directory
+touch .Renviron
+```
 
-The app makes use of several brapi functions to retrieve data from the database, such as ba\_studies\_table(), ba\_germplasm\_details2(), ba\_germplasm\_progeny(), ba\_phenotypes\_search(), and ba\_crosses\_study(). These functions are called within the app to fetch the required data based on user inputs and selections. 
+Then add the following two lines to the .Renviron file, replaced the text in quotes with your username and password
+
+```
+USER="yourbreedbaseusername"
+PASSWORD="yourbreedbasepassword"
+```
+
+**Implementation with BrAPI Library** 
+
+The SCT application utilizes the BrAPI library in R to interact with the BrAPI (Breeding API) database. The BrAPI library provides functions to connect to the database, retrieve data, and perform various operations. 
+
+To establish a connection to the BrAPI database, the as.ba\_db() function from the BrAPI library is used. The connection details, such as the database URL, user credentials, and other parameters, are specified in the app\_configs.R file. 
+
+The app makes use of several BrAPI functions to retrieve data from the database, such as ba\_studies\_table(), ba\_germplasm\_details2(), ba\_germplasm\_progeny(), ba\_phenotypes\_search(), and ba\_crosses\_study(). These functions are called within the app to fetch the required data based on user inputs and selections. 
 
 **Code Structure** 
 
-The STracT application follows a modular code structure using the Shiny framework in R. The main components of the code are: 
+The SCT application follows a modular code structure using the Shiny framework in R. The main components of the code are: 
 
 - **app.R**: The main application file that defines the user interface (UI) and server logic. 
 - **app\_functions.R**: Contains custom functions used in the application, such 
@@ -61,7 +77,7 @@ The server logic is implemented in the server function in app.R, which sources t
 
 **How to Contribute** 
 
-To contribute to the STracT application, follow these steps: 
+To contribute to the SCT application, follow these steps: 
 
 1. Fork the repository on GitHub. 
 1. Clone your forked repository to your local machine. 
