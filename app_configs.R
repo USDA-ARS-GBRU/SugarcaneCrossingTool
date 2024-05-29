@@ -9,7 +9,7 @@ location_iid_map <- list(
   "Louisiana" = "3678"  #needs to be updated each year
 )
 
-crosses_block_iid_map<-list(
+crosses_iid_map<-list(
   "DemoBreeder"="219"  #needs to be updated each year
 )
 

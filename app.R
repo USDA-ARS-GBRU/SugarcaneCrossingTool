@@ -68,7 +68,7 @@ ui <- dashboardPage(
     
     #this is kind of confusing. The idea is that multiple breeders might be working at same location (Florida) and they should be able to track crosses independently, even though cane lines are combined
     #so crossesid refers to crosses a specific breeder is making
-    selectInput("crossesid", "Select Breeder", choices=crosses_block_iid_map), 
+    selectInput("crossesid", "Select Breeder", choices=crosses_iid_map), 
     
     dateInput(
       "date",
@@ -357,7 +357,7 @@ server <- function(input, output, session) {
     validate(
       need(input$crossesid != "", "Please chose a breeder login:")
     )
-    crosses <- names(crosses_block_iid_map)[crosses_block_iid_map == input$crossesid]
+    crosses <- names(crosses_iid_map)[crosses_iid_map == input$crossesid]
     paste("Breeder:", crosses, "-", unique(ba_crosses_study(con = brap2, crossingProjectDbId = input$crossesid, rclass = "data.frame")$data.crossingProjectName[[1]])) #crossing project name has a breedbase bug- should return text, not number
     
     
