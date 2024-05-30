@@ -26,9 +26,25 @@ Note: Make sure to click the "Get Flower Inventory Data" button each time you ch
 
 **For Developers** 
 
+**To Install**
+
+Navigate to your desired directory and run:
+
+```
+git clone https://github.com/USDA-ARS-GBRU/SugarcaneCrossingTool.git
+```
+
+The open app.R in RStudio and type the following into the console. You may have to first install 'renv'. 
+
+```
+renv::restore()
+```
+
+
+
 **Connection to a Breedbase instance**
 
-In order to run the app locally, create or open a .Renviron file in your home directory
+In order to run the app locally, you need to create or open a .Renviron file in your home directory
 
 ```
 cd ~
