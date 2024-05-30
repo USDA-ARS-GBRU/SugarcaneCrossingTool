@@ -51,16 +51,14 @@ cd ~
 touch .Renviron
 ```
 
-Then add the following three lines to the .Renviron file, replaced the text in quotes with your URL, username, and password
+Then add the following three lines to the .Renviron file, replaced the text in quotes with your database URL, username, and password. 
 
 ```
 URL="yourbreedbaseurl"
-USER="yourbreedbaseusername"
-PASSWORD="yourbreedbasepassword"
+USERNAME="yourbreedbaseusername"
+PASS="yourbreedbasepassword"
 ```
 **Setting up the app_config.R file**
-
-(work in progress)
 
 As provide, the SCT application expects a config file specifing:
 
@@ -71,7 +69,7 @@ As provide, the SCT application expects a config file specifing:
 - **pedigree** and **historical cross** files downloaded from BreedBase
   - because these files are large and static, they are shipped with the app instead of being pulled each time
 
-Example files are provided.
+Example files are provided. If you are trying to connect to SugarcaneBase, you ***should not*** need to alter the app_config.R file. 
 
 **Implementation with BrAPI Library** 
 
