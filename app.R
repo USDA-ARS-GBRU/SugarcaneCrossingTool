@@ -225,15 +225,19 @@ ui <- dashboardPage(
           box(
             actionButton(
               inputId = "makecrosses",
-              label = "Get Cross Data"
+              label = "Get Data on Previous Crosses and Seedlots"
             ),
-            p("This table shows a count of crosses that have been made with the clones that are flowering on the 
-              date you selected as well as the summed number of progeny produced from those crosses. If the cross was made earlier this year, the 'Progeny.Per.Cross' column will read 'None yet, new cross this year'.")
+            p("This table shows a count of previous crosses that could be made with the clones that are flowering today and the summed number of progeny produced from those crosses. 
+              It also shows you the availability of exisiting seedlots for the crosses that could be made today.
+              If the cross was made earlier this year, the 'Progeny.Per.Cross' column will read 'None yet, new cross this year'.")
           )
         ),
         DTOutput("crossesTable")
       ),
 
+  
+
+      
       #### Download tab content ----
       tabItem(
         tabName = "download",

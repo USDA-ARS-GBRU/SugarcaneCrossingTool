@@ -22,25 +22,66 @@ PedMatrix <- function(pedigree) {
   return(relmat)
 }
 
-InitCrossTable <- function(cross_list, Female.Parent = "Female.Parent", Male.Parent = "Male.Parent", new_crosses = F) {
+InitCrossTable <- function(cross_list, Cross.Name="Cross.Unique.ID", Female.Parent = "Female.Parent", Male.Parent = "Male.Parent", new_crosses = F) {
+  
+  #germplasm is inventory_init() dataframe
+  
   if (dim(cross_list)[2] == 1) {
     # if cross list is empty (first day)
     return(NULL)
   }
-  # new_crosses means that there won't be any progenies because the cross was made this year
-  freq_crosses <- as.data.frame(table(cross_list[, Female.Parent], cross_list[, Male.Parent]))
-  freq_crosses <- freq_crosses[-which(freq_crosses$Freq == 0), ] # get rid of crosses never made
-  colnames(freq_crosses) <- c("Female.Parent", "Male.Parent", "Number.Crosses")
-  if (new_crosses == F) {
-    progeny_crosses <- as.data.frame(aggregate(Number.of.Progenies ~ Female.Parent + Male.Parent, FUN = sum, data = cross_list)) %>%
-      rename(Progeny.Per.Cross = Number.of.Progenies)
-    crosses_table <- freq_crosses %>%
-      right_join(progeny_crosses, by = c("Female.Parent", "Male.Parent"))
-    return(crosses_table)
+  
+  #filter first! goes faster
+  cross_list2<-cross_list[which(cross_list$Female.Parent %in% germplasm$Clone & cross_list$Male.Parent %in% germplasm$Clone), ]
+  
+  if(dim(cross_list2)[1]==0){
+    return(NULL)
+  }
+  
+  if (new_crosses==F) {
+
+    
+  ### get seedlot information
+    
+  seeds<-brapi::ba_seedlots_details(con=brap2, 
+                               crossName=gsub("^crossName=|&$", "", 
+                                              paste(paste0("crossName=",
+                                                           cross_list2$Cross.Unique.ID, "&"),
+                                                    collapse="")), 
+                               rclass="data.frame")
+ 
+  seeds$data.amount<-as.numeric(as.character(seeds$data.amount))
+  
+  seeds$Cross.Unique.ID<-gsub("SL-", "", seeds$data.seedLotName)
+   
+  #join with subset cross list
+  cross_list2<-cross_list2 %>% left_join(seeds, by="Cross.Unique.ID")
+  
+  #aggregate
+  cross_table<-as.data.frame(aggregate(Cross.Unique.ID ~ Female.Parent + Male.Parent, FUN = c, data = cross_list2)) %>% 
+    left_join(as.data.frame(aggregate(Number.of.Progenies ~ Female.Parent + Male.Parent, FUN = sum, data = cross_list2))) %>% 
+    left_join(  as.data.frame(aggregate(data.amount ~ Female.Parent + Male.Parent, FUN = sum, data = cross_list2)))
+  
+  cross_table$total.crosses<-apply(cross_table, 1, function(x) {length(x$Cross.Unique.ID)})
+  
+  #cleanup
+  colnames(cross_table)<-c("Female.Parent", "Male.Parent", "Cross.Names", "Total.Number.of.Progenies", "Seed.Quantity.grams", "Number.of.Crosses")    
+  
+  cross_table<-cross_table[,c(1:2, 4:6, 3)]
+    
+  return(cross_table)
+
   } else {
-    freq_crosses$Progeny.Per.Cross <- "None yet, new cross this year"
-    crosses_table <- freq_crosses
-    return(crosses_table)
+
+    # #using current crosses from this year
+    cross_table<-as.data.frame(aggregate(data.crossName~ data.parent1.germplasmName + data.parent2.germplasmName, FUN = c, data = cross_list))
+    colnames(cross_table)<-c("Female.Parent", "Male.Parent", "Cross.Names")
+    cross_table$Number.of.Crosses<-apply(cross_table, 1, function(x) {length(x$Cross.Names)})
+    cross_table<-cross_table %>% mutate(Seed.Quantity.grams="none yet - cross made this year", Total.Number.of.Progenies="none yet- cross made this year")
+
+    cross_table<-cross_table[,c(1:2, 4:6, 3)]
+
+    return(cross_table)
   }
 }
 
