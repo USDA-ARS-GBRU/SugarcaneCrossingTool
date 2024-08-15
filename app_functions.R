@@ -22,9 +22,8 @@ PedMatrix <- function(pedigree) {
   return(relmat)
 }
 
-InitCrossTable <- function(cross_list, Cross.Name="Cross.Unique.ID", Female.Parent = "Female.Parent", Male.Parent = "Male.Parent", new_crosses = F) {
+InitCrossTable <- function(cross_list, Cross.Name="Cross.Unique.ID", Female.Parent = "Female.Parent", Male.Parent = "Male.Parent", new_crosses = F, germplasm) {
   
-  #germplasm is inventory_init() dataframe
   
   if (dim(cross_list)[2] == 1) {
     # if cross list is empty (first day)
@@ -34,13 +33,14 @@ InitCrossTable <- function(cross_list, Cross.Name="Cross.Unique.ID", Female.Pare
   #filter first! goes faster
   cross_list2<-cross_list[which(cross_list$Female.Parent %in% germplasm$Clone & cross_list$Male.Parent %in% germplasm$Clone), ]
   
+ 
+  
   if(dim(cross_list2)[1]==0){
     return(NULL)
   }
   
   if (new_crosses==F) {
 
-    
   ### get seedlot information
     
   seeds<-brapi::ba_seedlots_details(con=brap2, 
