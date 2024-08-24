@@ -21,6 +21,7 @@ library(tis)
 library(fresh)
 library(networkD3)
 library(visNetwork)
+library(SimpleMating)
 
 # Include necessary JavaScript libraries
 
@@ -107,9 +108,12 @@ ui <- dashboardPage(
       menuItem("Download Data",
                tabName = "download",
                icon = icon("download")
+      ),
+      menuItem("Cross Optimization",
+               tabName = "optimization",
+               icon = icon("dna"))
       )
-    )
-  ),
+    ),
 
   ## BODY -----
 
@@ -247,10 +251,37 @@ ui <- dashboardPage(
                 A successful download will have a data in the file name."),
               downloadButton("downloaddata", "Download Data"))
         )
+      ),
+
+      ### Cross Optimization tab content ----
+      tabItem(
+        tabName = "optimization",
+      fluidRow(
+        box(
+          title = "Optimization Parameters",
+          numericInput("n_crosses", "Number of Crosses to Select:", 10, min = 1, max = 100),
+          numericInput("max_crosses_per_parent", "Max Crosses per Parent:", 3, min = 1, max = 10),
+          numericInput("min_crosses_per_parent", "Min Crosses per Parent:", 1, min = 0, max = 5),
+          numericInput("culling_k", "Culling Pairwise K:", 1, min = 0, max = 2, step = 0.1),
+          numericInput("prop_sel", "Proportion to Select:", 0.05, min = 0.01, max = 0.5, step = 0.01),
+          actionButton("run_optimization", "Run Optimization")
+        ),
+        box(
+          title = "Optimized Crossing Plan",
+          DTOutput("optimized_crosses_table")
+        )
+      ),
+      fluidRow(
+            box(
+            title = "Optimization Visualization",
+            plotOutput("optimization_plot")
+        )
+        )
       )
     )
   )
 )
+
 
 # Define the inventory_init function as a global variable
 inventory_init <<- eventReactive(input$brapipull, withProgress(message = "Pulling Inventory Data", {
@@ -365,6 +396,29 @@ server <- function(input, output, session) {
     paste("Breeder:", crosses, "-", unique(ba_crosses_study(con = brap2, crossingProjectDbId = input$crossesid, rclass = "data.frame")$data.crossingProjectName[[1]])) #crossing project name has a breedbase bug- should return text, not number
     
     
+  })
+
+  # Cross Optimization
+  observeEvent(input$run_optimization, {
+    # Get current inventory data
+    inventory_data <- inventory_init()
+    
+    # Run optimization
+    optimized_crosses <- optimize_crosses(inventory_data, 
+                                          n_crosses = input$n_crosses,
+                                          max_crosses_per_parent = input$max_crosses_per_parent,
+                                          min_crosses_per_parent = input$min_crosses_per_parent,
+                                          culling_k = input$culling_k,
+                                          prop_sel = input$prop_sel)
+    
+    # Display results
+    output$optimized_crosses_table <- renderDT({
+      datatable(optimized_crosses$crosses, options = list(pageLength = 10))
+    })
+    
+    output$optimization_plot <- renderPlot({
+      optimized_crosses$plot
+    })
   })
 }
 

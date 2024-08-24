@@ -178,3 +178,52 @@ createPedigreeGraph <- function(data, selected_clone_id = NULL) {
     return(NULL)
   }
 }
+
+optimize_crosses <- function(inventory_data, n_crosses, max_crosses_per_parent, min_crosses_per_parent, culling_k, prop_sel) {
+  # Extract clone names from inventory data
+  clones <- unique(inventory_data$Clone)
+  
+  # Create a dummy marker matrix (replace this with actual marker data when available)
+  dummy_markers <- matrix(sample(0:2, length(clones) * 100, replace = TRUE), nrow = length(clones))
+  rownames(dummy_markers) <- clones
+  colnames(dummy_markers) <- paste0("SNP", 1:100)
+  
+  # Create a dummy genetic map (replace this with actual genetic map when available)
+  dummy_map <- data.frame(
+    chr = rep(1:10, each = 10),
+    pos = rep(seq(0, 90, by = 10), 10),
+    mkr = colnames(dummy_markers)
+  )
+  
+  # Create a dummy marker effects vector (replace this with actual effects when available)
+  dummy_effects <- rnorm(100)
+  
+  # Calculate relationship matrix
+  rel_mat <- (dummy_markers %*% t(dummy_markers)) / ncol(dummy_markers)
+  
+  # Create crossing plan
+  cross_plan <- planCross(TargetPop = clones, MateDesign = "half")
+  
+  # Predict usefulness
+  usefulness <- getUsefA(MatePlan = cross_plan,
+                         Markers = dummy_markers,
+                         addEff = dummy_effects,
+                         Map.In = dummy_map,
+                         K = rel_mat,
+                         propSel = prop_sel,
+                         Type = "DH",
+                         Generation = 1)
+  
+  # Select crosses
+  optimized_plan <- selectCrosses(data = usefulness[[2]],
+                                  n.cross = n_crosses,
+                                  max.cross = max_crosses_per_parent,
+                                  min.cross = min_crosses_per_parent,
+                                  culling.pairwise.k = culling_k)
+  
+  # Prepare output
+  crosses <- optimized_plan[[2]]
+  plot <- optimized_plan[[3]]
+  
+  return(list(crosses = crosses, plot = plot))
+}
