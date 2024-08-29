@@ -179,47 +179,80 @@ createPedigreeGraph <- function(data, selected_clone_id = NULL) {
   }
 }
 
-optimize_crosses <- function(inventory_data, n_crosses, max_crosses_per_parent, min_crosses_per_parent, culling_k, prop_sel) {
-  # Extract clone names from inventory data
-  clones <- unique(inventory_data$Clone)
+optimize_crosses <- function(inventory_data, male_parents, female_parents, n_crosses, max_crosses_per_parent, min_crosses_per_parent, culling_k, prop_sel) {
+  # Filter inventory data for selected parents
+  selected_parents <- c(male_parents, female_parents)
+  filtered_inventory <- inventory_data[inventory_data$Clone %in% selected_parents, ]
   
-  # Create a dummy marker matrix (replace this with actual marker data when available)
-  dummy_markers <- matrix(sample(0:2, length(clones) * 100, replace = TRUE), nrow = length(clones))
-  rownames(dummy_markers) <- clones
-  colnames(dummy_markers) <- paste0("SNP", 1:100)
+  # Debug print
+  print("Selected parents:")
+  print(selected_parents)
   
-  # Create a dummy genetic map (replace this with actual genetic map when available)
-  dummy_map <- data.frame(
-    chr = rep(1:10, each = 10),
-    pos = rep(seq(0, 90, by = 10), 10),
-    mkr = colnames(dummy_markers)
+  # Create dummy BLUP values for two traits
+  n_parents <- length(selected_parents)
+  dummy_blup1 <- rnorm(n_parents)
+  dummy_blup2 <- rnorm(n_parents)
+  dummy_blups <- data.frame(
+    Clone = selected_parents,
+    Trait1 = dummy_blup1,
+    Trait2 = dummy_blup2
   )
   
-  # Create a dummy marker effects vector (replace this with actual effects when available)
-  dummy_effects <- rnorm(100)
+  # Create a dummy relationship matrix (you can replace this with pedmatrix_init() when available)
+  dummy_K <- matrix(runif(n_parents^2, 0, 1), nrow = n_parents, ncol = n_parents)
+  rownames(dummy_K) <- colnames(dummy_K) <- selected_parents
   
-  # Calculate relationship matrix
-  rel_mat <- (dummy_markers %*% t(dummy_markers)) / ncol(dummy_markers)
+  # Create custom crossing plan
+  cross_plan <- SimpleMating::planCross(TargetPop = female_parents, TargetPop2 = male_parents)
   
-  # Create crossing plan
-  cross_plan <- planCross(TargetPop = clones, MateDesign = "half")
+  # Debug print
+  print("Cross plan:")
+  print(head(cross_plan))
+  print(paste("Number of crosses:", nrow(cross_plan)))
   
-  # Predict usefulness
-  usefulness <- getUsefA(MatePlan = cross_plan,
-                         Markers = dummy_markers,
-                         addEff = dummy_effects,
-                         Map.In = dummy_map,
-                         K = rel_mat,
-                         propSel = prop_sel,
-                         Type = "DH",
-                         Generation = 1)
+  # Predict mid-parent average
+  tryCatch({
+    mpa <- SimpleMating::getMPA(MatePlan = cross_plan,
+                                Criterion = dummy_blups,
+                                K = dummy_K,
+                                Weights = c(0.5, 0.5))
+    
+    # Debug print
+    print("MPA calculation successful")
+    print(paste("Number of MPA entries:", nrow(mpa)))
+    
+  }, error = function(e) {
+    print(paste("Error in MPA calculation:", e$message))
+    print("Debugging information:")
+    print(paste("Dimensions of Criterion:", paste(dim(dummy_blups), collapse = "x")))
+    print(paste("Dimensions of K:", paste(dim(dummy_K), collapse = "x")))
+    return(NULL)
+  })
+  
+  if (is.null(mpa)) {
+    return(list(crosses = data.frame(), plot = NULL))
+  }
   
   # Select crosses
-  optimized_plan <- selectCrosses(data = usefulness[[2]],
-                                  n.cross = n_crosses,
-                                  max.cross = max_crosses_per_parent,
-                                  min.cross = min_crosses_per_parent,
-                                  culling.pairwise.k = culling_k)
+  tryCatch({
+    optimized_plan <- SimpleMating::selectCrosses(data = mpa,
+                                                  n.cross = n_crosses,
+                                                  max.cross = max_crosses_per_parent,
+                                                  min.cross = min_crosses_per_parent,
+                                                  culling.pairwise.k = culling_k)
+    
+    # Debug print
+    print("Cross selection successful")
+    print(paste("Number of selected crosses:", nrow(optimized_plan[[2]])))
+    
+  }, error = function(e) {
+    print(paste("Error in cross selection:", e$message))
+    return(NULL)
+  })
+  
+  if (is.null(optimized_plan)) {
+    return(list(crosses = data.frame(), plot = NULL))
+  }
   
   # Prepare output
   crosses <- optimized_plan[[2]]
