@@ -107,13 +107,14 @@ ui <- dashboardPage(
                tabName = "crosses",
                icon = icon("xmark")
       ),
+      menuItem("Cross Optimization",
+               tabName = "optimization",
+               icon = icon("dna")
+      ),
       menuItem("Download Data",
                tabName = "download",
                icon = icon("download")
-      ),
-      menuItem("Cross Optimization",
-               tabName = "optimization",
-               icon = icon("dna"))
+      )
       )
     ),
 
@@ -246,14 +247,22 @@ ui <- dashboardPage(
       
       #### Download tab content ----
       tabItem(
-        tabName = "download",
-        fluidRow(
-          box(p("This button will allow you to download a full data report as an excel file.
-                A partial download will fail, so make sure you've pulled all the inventory, pedigree, performance and cross data.
-                A successful download will have a data in the file name."),
-              downloadButton("downloaddata", "Download Data"))
-        )
-      ),
+  tabName = "download",
+  fluidRow(
+    box(
+      title = "Download Full Data Report",
+      p("This button will allow you to download a full data report as an excel file.
+        A partial download will fail, so make sure you've pulled all the inventory, pedigree, performance and cross data.
+        A successful download will have a date in the file name."),
+      downloadButton("downloaddata", "Download Full Data Report")
+    ),
+    box(
+      title = "Download Optimized Crossing Plan",
+      p("Click the button below to download the optimized crossing plan as an Excel file."),
+      downloadButton("download_optimized_plan", "Download Optimized Crossing Plan")
+    )
+  )
+),
 
       ### Cross Optimization tab content ----
       tabItem(
@@ -528,6 +537,22 @@ server <- function(input, output, session) {
         text(0, 0, "No plot available", cex = 1.5)
       }
     })
+
+    output$download_optimized_plan <- downloadHandler(
+  filename = function() {
+    paste("optimized_crossing_plan_", Sys.Date(), ".xlsx", sep = "")
+  },
+  content = function(file) {
+    # Check if optimized crosses exist
+    if (!is.null(optimized_crosses$crosses) && nrow(optimized_crosses$crosses) > 0) {
+      writexl::write_xlsx(optimized_crosses$crosses, path = file)
+    } else {
+      # If no optimized crosses, create a dummy dataframe with a message
+      dummy_data <- data.frame(Message = "No optimized crosses available. Please run the optimization first.")
+      writexl::write_xlsx(dummy_data, path = file)
+    }
+  }
+)
   })
 }
 
