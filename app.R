@@ -9,7 +9,6 @@ library(brapi)
 library(tidyverse)
 library(shiny)
 library(bs4Dash)
-library(brapirv1)
 library(DT)
 library(rjson)
 library(reshape2)
@@ -22,6 +21,9 @@ library(tis)
 library(fresh)
 library(networkD3)
 library(visNetwork)
+library(SimpleMating)
+library(sortable)
+
 
 # Include necessary JavaScript libraries
 
@@ -35,11 +37,11 @@ tags$head(
 # Source custom functions and configurations from separate files
 source("app_functions.R")
 source("app_configs.R")
-source("Flowering.R")
-source("Pedigree.R")
-source("performance.R")
-source("crosses.R")
-source("download_page.R")
+source("modules/flowering.R")
+source("modules/pedigree.R")
+source("modules/performance.R")
+source("modules/crosses.R")
+source("modules/download_page.R")
 
 
 ## THEME
@@ -51,7 +53,7 @@ brapi::ba_check(brap) # should be true, for debugging
 # USER INTERFACE  -------------------------------------------------------------
 
 ui <- dashboardPage(
-  title = "STracT",
+  title = "STC",
 
   ## CONTROLBAR ----
   controlbar = dashboardControlbar(
@@ -61,16 +63,20 @@ ui <- dashboardPage(
   ),
 
   ## HEADER --------
-  header = dashboardHeader(title = "Sugarcane Crossing Tool"),
+  header = dashboardHeader(title = "SCT"),
 
   ## SIDEBAR ------
   sidebar = dashboardSidebar(
     selectInput("location", "Select Location:", choices = location_iid_map),
-    textInput("crossesid", "Login with your CID:", value=""),
+    
+    #this is kind of confusing. The idea is that multiple breeders might be working at same location (Florida) and they should be able to track crosses independently, even though cane lines are combined
+    #so crossesid refers to crosses a specific breeder is making
+    selectInput("crossesid", "Select Breeder", choices=crosses_iid_map), 
     
     dateInput(
       "date",
-      "Choose A Date:"
+      "Choose A Date:",
+      value = "2023-10-10"
     ),
     
     p("for testing, select:", strong("October 10, 2023")),
@@ -101,12 +107,16 @@ ui <- dashboardPage(
                tabName = "crosses",
                icon = icon("xmark")
       ),
+      menuItem("Cross Optimization",
+               tabName = "optimization",
+               icon = icon("dna")
+      ),
       menuItem("Download Data",
                tabName = "download",
                icon = icon("download")
       )
-    )
-  ),
+      )
+    ),
 
   ## BODY -----
 
@@ -116,24 +126,20 @@ ui <- dashboardPage(
       ### Home content ----
       tabItem(
         tabName = "home",
-        h1("USDA Sugarcane Crossing Tool"),
-        p("Welcome to STracT, the Sugarcane crossing tool! This tool lets you 
-           see data and generate reports for all of the 
-          clones that are flowering on a specific day."),
-        h4("Here are instructions on how to use this tool."),
-        p("1. Choose a date from the calendar on the 
-          left for the day you want to see"),
-        p(
-          "2. Click 'Get Flower Inventory Data' to pull in data from",
-          a(href = "https://sugarcanebase.breedinginsight.net/", "SugarcaneBase"),
-          ". This will show you an inventory list of flowering clones in the 'Flowering' tab to the left"
-        ),
-        p("3. Next, you can click on any of the other tabs to see their associated data"),
-        p("4. You can also download a report using the 'Download' tab."),
-        h4("Note, you've logged in to view inventory for these can lines: "),
+        
+        h1("Sugarcane Integrated Breeding System (SIBS) Sugarcane Crossing Tool (SCT)"),
+        p("Welcome SCT! Click", a(href="https://github.com/USDA-ARS-GBRU/SugarcaneCrossingTool", "here"), "for instructions."),
+       
+        h1("Login information"),
+        
+        p("You've logged in to view inventory for this location: "),
+        
         textOutput("inventoryPointer"),
         
-        h4("Note, you've logged in to track this crossing experiment: "),
+        br(),
+        
+        p("You've logged in as:"),
+        
         textOutput("crossPointer")
       ),
 
@@ -226,28 +232,90 @@ ui <- dashboardPage(
           box(
             actionButton(
               inputId = "makecrosses",
-              label = "Get Cross Data"
+              label = "Get Data on Previous Crosses and Seedlots"
             ),
-            p("This table shows a count of crosses that have been made with the clones that are flowering on the 
-              date you selected as well as the summed number of progeny produced from those crosses. If the cross was made earlier this year, the 'Progeny.Per.Cross' column will read 'None yet, new cross this year'.")
+            p("This table shows a count of previous crosses that could be made with the clones that are flowering today and the summed number of progeny produced from those crosses. 
+              It also shows you the availability of exisiting seedlots for the crosses that could be made today.
+              If the cross was made earlier this year, the 'Progeny.Per.Cross' column will read 'None yet, new cross this year'.")
           )
         ),
         DTOutput("crossesTable")
       ),
 
+  
+
+      
       #### Download tab content ----
       tabItem(
-        tabName = "download",
+  tabName = "download",
+  fluidRow(
+    box(
+      title = "Download Full Data Report",
+      p("This button will allow you to download a full data report as an excel file.
+        A partial download will fail, so make sure you've pulled all the inventory, pedigree, performance and cross data.
+        A successful download will have a date in the file name."),
+      downloadButton("downloaddata", "Download Full Data Report")
+    ),
+    box(
+      title = "Download Optimized Crossing Plan",
+      p("Click the button below to download the optimized crossing plan as an Excel file."),
+      downloadButton("download_optimized_plan", "Download Optimized Crossing Plan")
+    )
+  )
+),
+
+      ### Cross Optimization tab content ----
+      tabItem(
+        tabName = "optimization",
         fluidRow(
-          box(p("This button will allow you to download a full data report as an excel file.
-                A partial download will fail, so make sure you've pulled all the inventory, pedigree, performance and cross data.
-                A successful download will have a data in the file name."),
-              downloadButton("downloaddata", "Download Data"))
+          box(
+            title = "Select Parents",
+            width = 12,
+            fluidRow(
+              column(
+                width = 4,
+                h4("Available Clones"),
+                uiOutput("available_clones")
+              ),
+              column(
+                width = 4,
+                h4("Male Parents"),
+                uiOutput("male_parents")
+              ),
+              column(
+                width = 4,
+                h4("Female Parents"),
+                uiOutput("female_parents")
+              )
+            )
+          )
+        ),
+        fluidRow(
+          box(
+            title = "Optimization Parameters",
+            numericInput("n_crosses", "Number of Crosses to Select:", 10, min = 1, max = 100),
+            numericInput("max_crosses_per_parent", "Max Crosses per Parent:", 3, min = 1, max = 10),
+            numericInput("min_crosses_per_parent", "Min Crosses per Parent:", 1, min = 0, max = 5),
+            numericInput("culling_k", "Culling Pairwise K:", 1, min = 0, max = 2, step = 0.1),
+            numericInput("prop_sel", "Proportion to Select:", 0.05, min = 0.01, max = 0.5, step = 0.01),
+            actionButton("run_optimization", "Run Optimization")
+          ),
+          box(
+            title = "Optimized Crossing Plan",
+            DTOutput("optimized_crosses_table")
+          )
+        ),
+        fluidRow(
+          box(
+            title = "Optimization Visualization",
+            plotOutput("optimization_plot")
+          )
         )
       )
     )
   )
 )
+
 
 # Define the inventory_init function as a global variable
 inventory_init <<- eventReactive(input$brapipull, withProgress(message = "Pulling Inventory Data", {
@@ -333,7 +401,7 @@ server <- function(input, output, session) {
   })
   
   # Reactive value for selected cross ID
-  reactive_cid <- reactive({input$crossesid})
+  reactive_cid <- reactive({as.character(input$crossesid)})
   
   # Add the renderText for dataSourceText
   output$dataSourceText <- renderText({
@@ -344,7 +412,7 @@ server <- function(input, output, session) {
   inventory_init <- flowering_server(input, output, session, reactive_date, reactive_iid, dataSource)
   pedigree_server(input, output, session, reactive_iid, selectedClone, inventory_init)
   performance_server(input, output, session, reactive_iid, rv, rv_trait_scatter, inventory_init)
-  crosses_server(input, output, session, reactive_iid, reactive_cid)
+  crosses_server(input, output, session, reactive_cid, inventory_init)
   download_page_server(input, output, session, reactive_date)
   
   # Output for inventory pointer
@@ -356,11 +424,138 @@ server <- function(input, output, session) {
   # Output for cross pointer
   output$crossPointer <- renderText({
     validate(
-      need(input$crossesid != "", "Please log in with your CID")
+      need(input$crossesid != "", "Please chose a breeder login:")
     )
-    unique(ba_crosses_study(con = brap2, crossingProjectDbId = as.character(input$crossesid), rclass = "data.frame")$data.crossingProjectName[[1]])
+    crosses <- names(crosses_iid_map)[crosses_iid_map == input$crossesid]
+    paste("Breeder:", crosses, "-", unique(ba_crosses_study(con = brap2, crossingProjectDbId = input$crossesid, rclass = "data.frame")$data.crossingProjectName[[1]])) #crossing project name has a breedbase bug- should return text, not number
+    
+    
+  })
+ # Reactive value to store the current state of clone assignments
+  clone_assignments <- reactiveVal(list(available = character(), male = character(), female = character()))
+  
+  # Initialize available clones
+  observe({
+    inventory_data <- inventory_init()
+    clones <- unique(inventory_data$Clone)
+    clone_assignments(list(available = clones, male = character(), female = character()))
+  })
+  
+  # Render sortable lists
+  output$available_clones <- renderUI({
+    bucket_list(
+      header = "Available Clones",
+      group_name = "clone_buckets",
+      orientation = "vertical",
+      add_rank_list(
+        text = "Drag clones from here",
+        labels = clone_assignments()$available,
+        input_id = "available_list"
+      )
+    )
+  })
+  
+  output$male_parents <- renderUI({
+    bucket_list(
+      header = "Male Parents",
+      group_name = "clone_buckets",
+      orientation = "vertical",
+      add_rank_list(
+        text = "Drag male parents here",
+        labels = clone_assignments()$male,
+        input_id = "male_list"
+      )
+    )
+  })
+  
+  output$female_parents <- renderUI({
+    bucket_list(
+      header = "Female Parents",
+      group_name = "clone_buckets",
+      orientation = "vertical",
+      add_rank_list(
+        text = "Drag female parents here",
+        labels = clone_assignments()$female,
+        input_id = "female_list"
+      )
+    )
+  })
+  
+  # Update clone assignments when lists change
+  observe({
+    clone_assignments(list(
+      available = input$available_list,
+      male = input$male_list,
+      female = input$female_list
+    ))
+  })
+  
+  # Cross Optimization
+  observeEvent(input$run_optimization, {
+    # Get current inventory data
+    inventory_data <- inventory_init()
+    
+    # Get selected parents
+    male_parents <- clone_assignments()$male
+    female_parents <- clone_assignments()$female
+    
+    # Check if parents are selected
+    if (length(male_parents) == 0 || length(female_parents) == 0) {
+      showNotification("Please select both male and female parents before running optimization.", type = "error")
+      return()
+    }
+    
+    # Run optimization
+    optimized_crosses <- tryCatch({
+      optimize_crosses(inventory_data, 
+                       male_parents,
+                       female_parents,
+                       n_crosses = input$n_crosses,
+                       max_crosses_per_parent = input$max_crosses_per_parent,
+                       min_crosses_per_parent = input$min_crosses_per_parent,
+                       culling_k = input$culling_k,
+                       prop_sel = input$prop_sel)
+    }, error = function(e) {
+      showNotification(paste("Error in optimization:", e$message), type = "error")
+      return(list(crosses = data.frame(), plot = NULL))
+    })
+    
+    # Display results
+    output$optimized_crosses_table <- renderDT({
+      if (!is.null(optimized_crosses$crosses) && nrow(optimized_crosses$crosses) > 0) {
+        datatable(optimized_crosses$crosses, options = list(pageLength = 10))
+      } else {
+        datatable(data.frame(Message = "No crosses found or error occurred"), options = list(pageLength = 10))
+      }
+    })
+    
+    output$optimization_plot <- renderPlot({
+      if (!is.null(optimized_crosses$plot)) {
+        optimized_crosses$plot
+      } else {
+        plot(0, 0, type = "n", axes = FALSE, xlab = "", ylab = "")
+        text(0, 0, "No plot available", cex = 1.5)
+      }
+    })
+
+    output$download_optimized_plan <- downloadHandler(
+  filename = function() {
+    paste("optimized_crossing_plan_", Sys.Date(), ".xlsx", sep = "")
+  },
+  content = function(file) {
+    # Check if optimized crosses exist
+    if (!is.null(optimized_crosses$crosses) && nrow(optimized_crosses$crosses) > 0) {
+      writexl::write_xlsx(optimized_crosses$crosses, path = file)
+    } else {
+      # If no optimized crosses, create a dummy dataframe with a message
+      dummy_data <- data.frame(Message = "No optimized crosses available. Please run the optimization first.")
+      writexl::write_xlsx(dummy_data, path = file)
+    }
+  }
+)
   })
 }
 
 # Run the Shiny app
 shinyApp(ui, server)
+  

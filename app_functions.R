@@ -22,25 +22,66 @@ PedMatrix <- function(pedigree) {
   return(relmat)
 }
 
-InitCrossTable <- function(cross_list, Female.Parent = "Female.Parent", Male.Parent = "Male.Parent", new_crosses = F) {
+InitCrossTable <- function(cross_list, Cross.Name="Cross.Unique.ID", Female.Parent = "Female.Parent", Male.Parent = "Male.Parent", new_crosses = F, germplasm) {
+  
+  
   if (dim(cross_list)[2] == 1) {
     # if cross list is empty (first day)
     return(NULL)
   }
-  # new_crosses means that there won't be any progenies because the cross was made this year
-  freq_crosses <- as.data.frame(table(cross_list[, Female.Parent], cross_list[, Male.Parent]))
-  freq_crosses <- freq_crosses[-which(freq_crosses$Freq == 0), ] # get rid of crosses never made
-  colnames(freq_crosses) <- c("Female.Parent", "Male.Parent", "Number.Crosses")
-  if (new_crosses == F) {
-    progeny_crosses <- as.data.frame(aggregate(Number.of.Progenies ~ Female.Parent + Male.Parent, FUN = sum, data = cross_list)) %>%
-      rename(Progeny.Per.Cross = Number.of.Progenies)
-    crosses_table <- freq_crosses %>%
-      right_join(progeny_crosses, by = c("Female.Parent", "Male.Parent"))
-    return(crosses_table)
+  
+  #filter first! goes faster
+  cross_list2<-cross_list[which(cross_list$Female.Parent %in% germplasm$Clone & cross_list$Male.Parent %in% germplasm$Clone), ]
+  
+ 
+  
+  if(dim(cross_list2)[1]==0){
+    return(NULL)
+  }
+  
+  if (new_crosses==F) {
+
+  ### get seedlot information
+    
+  seeds<-brapi::ba_seedlots_details(con=brap2, 
+                               crossName=gsub("^crossName=|&$", "", 
+                                              paste(paste0("crossName=",
+                                                           cross_list2$Cross.Unique.ID, "&"),
+                                                    collapse="")), 
+                               rclass="data.frame")
+ 
+  seeds$data.amount<-as.numeric(as.character(seeds$data.amount))
+  
+  seeds$Cross.Unique.ID<-gsub("SL-", "", seeds$data.seedLotName)
+   
+  #join with subset cross list
+  cross_list2<-cross_list2 %>% left_join(seeds, by="Cross.Unique.ID")
+  
+  #aggregate
+  cross_table<-as.data.frame(aggregate(Cross.Unique.ID ~ Female.Parent + Male.Parent, FUN = c, data = cross_list2)) %>% 
+    left_join(as.data.frame(aggregate(Number.of.Progenies ~ Female.Parent + Male.Parent, FUN = sum, data = cross_list2))) %>% 
+    left_join(  as.data.frame(aggregate(data.amount ~ Female.Parent + Male.Parent, FUN = sum, data = cross_list2)))
+  
+  cross_table$total.crosses<-apply(cross_table, 1, function(x) {length(x$Cross.Unique.ID)})
+  
+  #cleanup
+  colnames(cross_table)<-c("Female.Parent", "Male.Parent", "Cross.Names", "Total.Number.of.Progenies", "Seed.Quantity.grams", "Number.of.Crosses")    
+  
+  cross_table<-cross_table[,c(1:2, 4:6, 3)]
+    
+  return(cross_table)
+
   } else {
-    freq_crosses$Progeny.Per.Cross <- "None yet, new cross this year"
-    crosses_table <- freq_crosses
-    return(crosses_table)
+
+    # #using current crosses from this year
+    cross_table<-as.data.frame(aggregate(data.crossName~ data.parent1.germplasmName + data.parent2.germplasmName, FUN = c, data = cross_list))
+    colnames(cross_table)<-c("Female.Parent", "Male.Parent", "Cross.Names")
+    cross_table$Number.of.Crosses<-apply(cross_table, 1, function(x) {length(x$Cross.Names)})
+    cross_table<-cross_table %>% mutate(Seed.Quantity.grams="none yet - cross made this year", Total.Number.of.Progenies="none yet- cross made this year")
+
+    cross_table<-cross_table[,c(1:2, 4:6, 3)]
+
+    return(cross_table)
   }
 }
 
@@ -136,4 +177,86 @@ createPedigreeGraph <- function(data, selected_clone_id = NULL) {
   } else {
     return(NULL)
   }
+}
+
+optimize_crosses <- function(inventory_data, male_parents, female_parents, n_crosses, max_crosses_per_parent, min_crosses_per_parent, culling_k, prop_sel) {
+  # Filter inventory data for selected parents
+  selected_parents <- c(male_parents, female_parents)
+  filtered_inventory <- inventory_data[inventory_data$Clone %in% selected_parents, ]
+  
+  # Debug print
+  print("Selected parents:")
+  print(selected_parents)
+  
+  # Create dummy BLUP values for two traits
+  n_parents <- length(selected_parents)
+  dummy_blup1 <- rnorm(n_parents)
+  dummy_blup2 <- rnorm(n_parents)
+  dummy_blups <- data.frame(
+    Clone = selected_parents,
+    Trait1 = dummy_blup1,
+    Trait2 = dummy_blup2
+  )
+  
+  # Create a dummy relationship matrix (you can replace this with pedmatrix_init() when available)
+  dummy_K <- matrix(runif(n_parents^2, 0, 1), nrow = n_parents, ncol = n_parents)
+  rownames(dummy_K) <- colnames(dummy_K) <- selected_parents
+  
+  # Create custom crossing plan
+  cross_plan <- SimpleMating::planCross(TargetPop = female_parents, TargetPop2 = male_parents)
+  
+  # Debug print
+  print("Cross plan:")
+  print(head(cross_plan))
+  print(paste("Number of crosses:", nrow(cross_plan)))
+  
+  # Predict mid-parent average
+  tryCatch({
+    mpa <- SimpleMating::getMPA(MatePlan = cross_plan,
+                                Criterion = dummy_blups,
+                                K = dummy_K,
+                                Weights = c(0.5, 0.5))
+    
+    # Debug print
+    print("MPA calculation successful")
+    print(paste("Number of MPA entries:", nrow(mpa)))
+    
+  }, error = function(e) {
+    print(paste("Error in MPA calculation:", e$message))
+    print("Debugging information:")
+    print(paste("Dimensions of Criterion:", paste(dim(dummy_blups), collapse = "x")))
+    print(paste("Dimensions of K:", paste(dim(dummy_K), collapse = "x")))
+    return(NULL)
+  })
+  
+  if (is.null(mpa)) {
+    return(list(crosses = data.frame(), plot = NULL))
+  }
+  
+  # Select crosses
+  tryCatch({
+    optimized_plan <- SimpleMating::selectCrosses(data = mpa,
+                                                  n.cross = n_crosses,
+                                                  max.cross = max_crosses_per_parent,
+                                                  min.cross = min_crosses_per_parent,
+                                                  culling.pairwise.k = culling_k)
+    
+    # Debug print
+    print("Cross selection successful")
+    print(paste("Number of selected crosses:", nrow(optimized_plan[[2]])))
+    
+  }, error = function(e) {
+    print(paste("Error in cross selection:", e$message))
+    return(NULL)
+  })
+  
+  if (is.null(optimized_plan)) {
+    return(list(crosses = data.frame(), plot = NULL))
+  }
+  
+  # Prepare output
+  crosses <- optimized_plan[[2]]
+  plot <- optimized_plan[[3]]
+  
+  return(list(crosses = crosses, plot = plot))
 }

@@ -6,3 +6,8 @@ testdata/
 .Renviron
 .sass_cache_keys
 .DS_Store
+XingAppV2.Rproj
+debugging.R
+.Rapp.history
+test.R
+.gitignore
