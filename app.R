@@ -21,6 +21,7 @@ library(tis)
 library(fresh)
 library(networkD3)
 library(visNetwork)
+library(bslib)
 
 # Include necessary JavaScript libraries
 
@@ -50,6 +51,8 @@ brapi::ba_check(brap) # should be true, for debugging
 # USER INTERFACE  -------------------------------------------------------------
 
 ui <- dashboardPage(
+  
+
   title = "STC",
 
   ## CONTROLBAR ----
@@ -64,15 +67,15 @@ ui <- dashboardPage(
 
   ## SIDEBAR ------
   sidebar = dashboardSidebar(
-    selectInput("location", "Select Location:", choices = location_iid_map),
+    selectInput("location", "Step 1: Select Location", choices = location_iid_map),
     
     #this is kind of confusing. The idea is that multiple breeders might be working at same location (Florida) and they should be able to track crosses independently, even though cane lines are combined
     #so crossesid refers to crosses a specific breeder is making
-    selectInput("crossesid", "Select Breeder", choices=crosses_iid_map), 
+    selectInput("crossesid", "Step 2: Select Breeder", choices=crosses_iid_map), 
     
     dateInput(
       "date",
-      "Choose A Date:",
+      "Step 3: Choose A Date",
       value = "2023-10-10"
     ),
     
@@ -121,25 +124,38 @@ ui <- dashboardPage(
         tabName = "home",
         
         h1("Sugarcane Integrated Breeding System (SIBS) Sugarcane Crossing Tool (SCT)"),
-        p("Welcome SCT! Click", a(href="https://github.com/USDA-ARS-GBRU/SugarcaneCrossingTool", "here"), "for instructions."),
+        p("Welcome to SCT! To use this app, log in by selecting yoru location and name from the sidebar on the left. Once the correct login information appears in red below, select your desired date. 
+          When the correct date shows up in blue below, click on the 'Get Flower Inventory' button and move to the Flowering Inventory tab to view your data and sort flowering clones by gender.
+          
+          You can follow ", a(href="https://github.com/USDA-ARS-GBRU/SugarcaneCrossingTool", "this link"), " to the github repo for detailed instructions."),
        
-        h1("Login information"),
+        card(
+          
+        card_header("Login Information"),
+        
         
         p("You've logged in to view inventory for this location: "),
         
-        textOutput("inventoryPointer"),
+        span(textOutput("inventoryPointer"), style="color:red"),
         
         br(),
         
-        p("You've logged in as:"),
+        p("You've logged in as User:"),
         
-        textOutput("crossPointer")
-      ),
+        span(textOutput("crossPointer"), style="color:red")),
+        
+        card(
+          card_header("Inventory Information"),
+          
+          p("You're viewing inventory for this day:"),
+          span(textOutput("datePointer"), style="color:blue"))),
 
       ### Flowering tab content -----
       tabItem(
         tabName = "flowering",
+        
         fluidRow(
+        
           box(p("This table shows you the count and sex of each clone that is flowering on the day you selected.")),
           textOutput("dataSourceText"),
           DTOutput("inventoryTable")
@@ -364,6 +380,17 @@ server <- function(input, output, session) {
     crosses <- names(crosses_iid_map)[crosses_iid_map == input$crossesid]
     paste("Breeder:", crosses, "-", unique(ba_crosses_study(con = brap2, crossingProjectDbId = input$crossesid, rclass = "data.frame")$data.crossingProjectName[[1]])) #crossing project name has a breedbase bug- should return text, not number
     
+    
+  })
+  
+  #output for inventory date pointer 
+  
+  output$datePointer <- renderText({
+    # validate(
+    #   need(input$date != "", "Please chose a date")
+    # )
+    
+    paste(as.character(input$date))
     
   })
 }
