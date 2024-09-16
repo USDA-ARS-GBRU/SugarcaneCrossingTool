@@ -178,3 +178,85 @@ createPedigreeGraph <- function(data, selected_clone_id = NULL) {
     return(NULL)
   }
 }
+
+optimize_crosses <- function(inventory_data, male_parents, female_parents, n_crosses, max_crosses_per_parent, min_crosses_per_parent, culling_k, prop_sel) {
+  # Filter inventory data for selected parents
+  selected_parents <- c(male_parents, female_parents)
+  filtered_inventory <- inventory_data[inventory_data$Clone %in% selected_parents, ]
+  
+  # Debug print
+  print("Selected parents:")
+  print(selected_parents)
+  
+  # Create dummy BLUP values for two traits
+  n_parents <- length(selected_parents)
+  dummy_blup1 <- rnorm(n_parents)
+  dummy_blup2 <- rnorm(n_parents)
+  dummy_blups <- data.frame(
+    Clone = selected_parents,
+    Trait1 = dummy_blup1,
+    Trait2 = dummy_blup2
+  )
+  
+  # Create a dummy relationship matrix (you can replace this with pedmatrix_init() when available)
+  dummy_K <- matrix(runif(n_parents^2, 0, 1), nrow = n_parents, ncol = n_parents)
+  rownames(dummy_K) <- colnames(dummy_K) <- selected_parents
+  
+  # Create custom crossing plan
+  cross_plan <- SimpleMating::planCross(TargetPop = female_parents, TargetPop2 = male_parents)
+  
+  # Debug print
+  print("Cross plan:")
+  print(head(cross_plan))
+  print(paste("Number of crosses:", nrow(cross_plan)))
+  
+  # Predict mid-parent average
+  tryCatch({
+    mpa <- SimpleMating::getMPA(MatePlan = cross_plan,
+                                Criterion = dummy_blups,
+                                K = dummy_K,
+                                Weights = c(0.5, 0.5))
+    
+    # Debug print
+    print("MPA calculation successful")
+    print(paste("Number of MPA entries:", nrow(mpa)))
+    
+  }, error = function(e) {
+    print(paste("Error in MPA calculation:", e$message))
+    print("Debugging information:")
+    print(paste("Dimensions of Criterion:", paste(dim(dummy_blups), collapse = "x")))
+    print(paste("Dimensions of K:", paste(dim(dummy_K), collapse = "x")))
+    return(NULL)
+  })
+  
+  if (is.null(mpa)) {
+    return(list(crosses = data.frame(), plot = NULL))
+  }
+  
+  # Select crosses
+  tryCatch({
+    optimized_plan <- SimpleMating::selectCrosses(data = mpa,
+                                                  n.cross = n_crosses,
+                                                  max.cross = max_crosses_per_parent,
+                                                  min.cross = min_crosses_per_parent,
+                                                  culling.pairwise.k = culling_k)
+    
+    # Debug print
+    print("Cross selection successful")
+    print(paste("Number of selected crosses:", nrow(optimized_plan[[2]])))
+    
+  }, error = function(e) {
+    print(paste("Error in cross selection:", e$message))
+    return(NULL)
+  })
+  
+  if (is.null(optimized_plan)) {
+    return(list(crosses = data.frame(), plot = NULL))
+  }
+  
+  # Prepare output
+  crosses <- optimized_plan[[2]]
+  plot <- optimized_plan[[3]]
+  
+  return(list(crosses = crosses, plot = plot))
+}

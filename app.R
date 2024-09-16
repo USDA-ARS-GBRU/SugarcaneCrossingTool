@@ -21,6 +21,9 @@ library(tis)
 library(fresh)
 library(networkD3)
 library(visNetwork)
+library(SimpleMating)
+library(sortable)
+
 
 # Include necessary JavaScript libraries
 
@@ -104,12 +107,16 @@ ui <- dashboardPage(
                tabName = "crosses",
                icon = icon("xmark")
       ),
+      menuItem("Cross Optimization",
+               tabName = "optimization",
+               icon = icon("dna")
+      ),
       menuItem("Download Data",
                tabName = "download",
                icon = icon("download")
       )
-    )
-  ),
+      )
+    ),
 
   ## BODY -----
 
@@ -240,17 +247,75 @@ ui <- dashboardPage(
       
       #### Download tab content ----
       tabItem(
-        tabName = "download",
+  tabName = "download",
+  fluidRow(
+    box(
+      title = "Download Full Data Report",
+      p("This button will allow you to download a full data report as an excel file.
+        A partial download will fail, so make sure you've pulled all the inventory, pedigree, performance and cross data.
+        A successful download will have a date in the file name."),
+      downloadButton("downloaddata", "Download Full Data Report")
+    ),
+    box(
+      title = "Download Optimized Crossing Plan",
+      p("Click the button below to download the optimized crossing plan as an Excel file."),
+      downloadButton("download_optimized_plan", "Download Optimized Crossing Plan")
+    )
+  )
+),
+
+      ### Cross Optimization tab content ----
+      tabItem(
+        tabName = "optimization",
         fluidRow(
-          box(p("This button will allow you to download a full data report as an excel file.
-                A partial download will fail, so make sure you've pulled all the inventory, pedigree, performance and cross data.
-                A successful download will have a data in the file name."),
-              downloadButton("downloaddata", "Download Data"))
+          box(
+            title = "Select Parents",
+            width = 12,
+            fluidRow(
+              column(
+                width = 4,
+                h4("Available Clones"),
+                uiOutput("available_clones")
+              ),
+              column(
+                width = 4,
+                h4("Male Parents"),
+                uiOutput("male_parents")
+              ),
+              column(
+                width = 4,
+                h4("Female Parents"),
+                uiOutput("female_parents")
+              )
+            )
+          )
+        ),
+        fluidRow(
+          box(
+            title = "Optimization Parameters",
+            numericInput("n_crosses", "Number of Crosses to Select:", 10, min = 1, max = 100),
+            numericInput("max_crosses_per_parent", "Max Crosses per Parent:", 3, min = 1, max = 10),
+            numericInput("min_crosses_per_parent", "Min Crosses per Parent:", 1, min = 0, max = 5),
+            numericInput("culling_k", "Culling Pairwise K:", 1, min = 0, max = 2, step = 0.1),
+            numericInput("prop_sel", "Proportion to Select:", 0.05, min = 0.01, max = 0.5, step = 0.01),
+            actionButton("run_optimization", "Run Optimization")
+          ),
+          box(
+            title = "Optimized Crossing Plan",
+            DTOutput("optimized_crosses_table")
+          )
+        ),
+        fluidRow(
+          box(
+            title = "Optimization Visualization",
+            plotOutput("optimization_plot")
+          )
         )
       )
     )
   )
 )
+
 
 # Define the inventory_init function as a global variable
 inventory_init <<- eventReactive(input$brapipull, withProgress(message = "Pulling Inventory Data", {
@@ -366,7 +431,131 @@ server <- function(input, output, session) {
     
     
   })
+ # Reactive value to store the current state of clone assignments
+  clone_assignments <- reactiveVal(list(available = character(), male = character(), female = character()))
+  
+  # Initialize available clones
+  observe({
+    inventory_data <- inventory_init()
+    clones <- unique(inventory_data$Clone)
+    clone_assignments(list(available = clones, male = character(), female = character()))
+  })
+  
+  # Render sortable lists
+  output$available_clones <- renderUI({
+    bucket_list(
+      header = "Available Clones",
+      group_name = "clone_buckets",
+      orientation = "vertical",
+      add_rank_list(
+        text = "Drag clones from here",
+        labels = clone_assignments()$available,
+        input_id = "available_list"
+      )
+    )
+  })
+  
+  output$male_parents <- renderUI({
+    bucket_list(
+      header = "Male Parents",
+      group_name = "clone_buckets",
+      orientation = "vertical",
+      add_rank_list(
+        text = "Drag male parents here",
+        labels = clone_assignments()$male,
+        input_id = "male_list"
+      )
+    )
+  })
+  
+  output$female_parents <- renderUI({
+    bucket_list(
+      header = "Female Parents",
+      group_name = "clone_buckets",
+      orientation = "vertical",
+      add_rank_list(
+        text = "Drag female parents here",
+        labels = clone_assignments()$female,
+        input_id = "female_list"
+      )
+    )
+  })
+  
+  # Update clone assignments when lists change
+  observe({
+    clone_assignments(list(
+      available = input$available_list,
+      male = input$male_list,
+      female = input$female_list
+    ))
+  })
+  
+  # Cross Optimization
+  observeEvent(input$run_optimization, {
+    # Get current inventory data
+    inventory_data <- inventory_init()
+    
+    # Get selected parents
+    male_parents <- clone_assignments()$male
+    female_parents <- clone_assignments()$female
+    
+    # Check if parents are selected
+    if (length(male_parents) == 0 || length(female_parents) == 0) {
+      showNotification("Please select both male and female parents before running optimization.", type = "error")
+      return()
+    }
+    
+    # Run optimization
+    optimized_crosses <- tryCatch({
+      optimize_crosses(inventory_data, 
+                       male_parents,
+                       female_parents,
+                       n_crosses = input$n_crosses,
+                       max_crosses_per_parent = input$max_crosses_per_parent,
+                       min_crosses_per_parent = input$min_crosses_per_parent,
+                       culling_k = input$culling_k,
+                       prop_sel = input$prop_sel)
+    }, error = function(e) {
+      showNotification(paste("Error in optimization:", e$message), type = "error")
+      return(list(crosses = data.frame(), plot = NULL))
+    })
+    
+    # Display results
+    output$optimized_crosses_table <- renderDT({
+      if (!is.null(optimized_crosses$crosses) && nrow(optimized_crosses$crosses) > 0) {
+        datatable(optimized_crosses$crosses, options = list(pageLength = 10))
+      } else {
+        datatable(data.frame(Message = "No crosses found or error occurred"), options = list(pageLength = 10))
+      }
+    })
+    
+    output$optimization_plot <- renderPlot({
+      if (!is.null(optimized_crosses$plot)) {
+        optimized_crosses$plot
+      } else {
+        plot(0, 0, type = "n", axes = FALSE, xlab = "", ylab = "")
+        text(0, 0, "No plot available", cex = 1.5)
+      }
+    })
+
+    output$download_optimized_plan <- downloadHandler(
+  filename = function() {
+    paste("optimized_crossing_plan_", Sys.Date(), ".xlsx", sep = "")
+  },
+  content = function(file) {
+    # Check if optimized crosses exist
+    if (!is.null(optimized_crosses$crosses) && nrow(optimized_crosses$crosses) > 0) {
+      writexl::write_xlsx(optimized_crosses$crosses, path = file)
+    } else {
+      # If no optimized crosses, create a dummy dataframe with a message
+      dummy_data <- data.frame(Message = "No optimized crosses available. Please run the optimization first.")
+      writexl::write_xlsx(dummy_data, path = file)
+    }
+  }
+)
+  })
 }
 
 # Run the Shiny app
 shinyApp(ui, server)
+  
