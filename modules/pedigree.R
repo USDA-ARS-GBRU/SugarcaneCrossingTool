@@ -1,10 +1,14 @@
 #Pedigree.R
 
 ## Pedigree and Progeny ----
-pedigree_server <- function(input, output, session, reactive_iid, selectedClone, inventory_init) {
+pedigree_server <- function(input, output, session, reactive_iid, selectedClone, inventory_init, clone_assignments) {
   pedigree_init <- eventReactive(input$makepedigree, withProgress(message = "Pulling Progeny Data", {
     germplasm <- as.data.frame(inventory_init())
     germplasm <- germplasm[duplicated(germplasm$Clone) == FALSE, ]
+    
+    #Only show sorted clones
+    display<-c(input$male_list,input$female_list)
+    germplasm<-germplasm[which(germplasm$Clone%in%display),]
 
     tmp <- stripClass(
       as.data.frame(
@@ -19,14 +23,19 @@ pedigree_server <- function(input, output, session, reactive_iid, selectedClone,
     pedigree <- tmp[tmp$data.germplasmName %in% germplasm$Clone, c("data.germplasmName", "data.germplasmDbId", "data.pedigree")] %>%
       rename(Clone = data.germplasmName, Pedigree = data.pedigree)
 
+    #note: could rewrite ba_germplam_progeny to speed performance
+    
     for (i in 1:dim(pedigree)[1]) {
       pedigree[i, 4] <-
         fromJSON(brapi::ba_germplasm_progeny(con = brap, germplasmDbId = as.character(pedigree[i, 2]), rclass = "json"))$metadata$pagination$totalCount
     }
 
     colnames(pedigree)[4] <- "Number.Progeny"
-
-    pedigree[, -which(colnames(pedigree) == "data.germplasmDbId")]
+  
+    
+    pedigree<-pedigree[,-which(colnames(pedigree) == "data.germplasmDbId")]
+    
+    return(pedigree)
   }))
 
   deeppedigree_init <- eventReactive(input$selectedClone, {
@@ -47,25 +56,33 @@ pedigree_server <- function(input, output, session, reactive_iid, selectedClone,
 
     mat <- PedMatrix(pedigree_download)
 
-    if ("LCP85-0384" %in% germplasm$Clone) {
-      axis <- germplasm$Clone
-    } else {
-      axis <- c(germplasm$Clone, "LCP85-0384")
-    }
-
-    mat2 <- round(mat[axis, axis], 2)
+    #get rid of this for now
+    # if ("LCP85-0384" %in% germplasm$Clone) {
+    #   axis <- germplasm$Clone
+    # } else {
+    #   axis <- c(germplasm$Clone, "LCP85-0384")
+    # }
+    
+    mat2 <- round(mat[input$male_list,input$female_list ], 2)
     mat2 <- as.data.frame(mat2)
     mat2$Clone <- rownames(mat2)
     mat2 <- mat2[, c(dim(mat2)[2], 1:dim(mat2)[2] - 1)]
     return(mat2)
   })
 
-  output$pedigreeTable <- ({
-    renderDT(merge(pedigree_init(), pedmatrix_init()[, c("LCP85-0384", "Clone")],
-      by = "Clone"
-    ) %>% rename(Rel.2.LCP850384 = "LCP85-0384"), options = list(language = list(
-      zeroRecords = "There are no pedigree records to display. Double check that there are inventory records for the date you selected"
-    )))
+  #get rid of this for now
+  # output$pedigreeTable <- ({
+  #   renderDT(merge(pedigree_init(), pedmatrix_init()[, c("LCP85-0384", "Clone")],
+  #     by = "Clone"
+  #   ) %>% rename(Rel.2.LCP850384 = "LCP85-0384"), options = list(language = list(
+  #     zeroRecords = "There are no pedigree records to display. Double check that there are inventory records for the date you selected"
+  #   )))
+    
+    
+    output$pedigreeTable <- ({
+      renderDT(pedigree_init() , options = list(language = list(
+        zeroRecords = "There are no pedigree records to display. Double check that there are inventory records for the date you selected"
+      )))
   })
 
   selectedClone <- reactiveVal()
@@ -94,6 +111,6 @@ pedigree_server <- function(input, output, session, reactive_iid, selectedClone,
 
   output$pedigreeMatrix <- renderPlotly({
     pedmatrix_data <- pedmatrix_init()
-    heatmaply(pedmatrix_data)
+    heatmaply(pedmatrix_data, xlab="Female Parent", ylab="Male Parent")
   })
 }
