@@ -131,10 +131,13 @@ ui <- dashboardPage(
         tabName = "home",
         
         h1("Sugarcane Integrated Breeding System (SIBS) Sugarcane Crossing Tool (SCT)"),
-        p("Welcome to SCT! To use this app, log in by 1. Selecting a Location and 2. Selecing a Breeder Name from the sidebar on the left. Once the correct login information appears below, 3. Chose A Date. 
-          When the correct date populates the Inventory Information card below, 4. Click on the 'Get Flower Inventory' button and move to the Flowering Inventory tab to view your data and sort flowering clones by gender.
-          
-          You can follow ", a(href="https://github.com/USDA-ARS-GBRU/SugarcaneCrossingTool", "this link"), " to the github repo for detailed instructions."),
+        p("Welcome to SCT! To use this app, follow the instructions below:"),
+        p("* Start by loggin in: from the sidebar on the left, (1) select a location and (2) breeder name."),
+        p("* Then, chose an (3) inventory date."),
+        p("* Next, (4) Click on the 'Get Flower Inventory' button"),
+        p("* After that, move to the Flowering Inventory tab to view your data and sort flowering clones by gender"),
+        p("* You can then click on other tabs to explore related breeding data"),
+        p("Follow ", a(href="https://github.com/USDA-ARS-GBRU/SugarcaneCrossingTool", "this link"), " to the github repo for detailed instructions."),
        
         card(
           
@@ -143,13 +146,13 @@ ui <- dashboardPage(
         
         p("You've logged in to view inventory for this location: "),
         
-        span(textOutput("inventoryPointer"), style="color:red"),
+        span(textOutput("inventoryPointer"), style="color:blue"),
         
         br(),
         
         p("You've logged in as User:"),
         
-        span(textOutput("crossPointer"), style="color:red")),
+        span(textOutput("crossPointer"), style="color:blue")),
         
         card(
           card_header("Inventory Information"),
@@ -332,7 +335,7 @@ ui <- dashboardPage(
       ### Cross Optimization tab content ----
       tabItem(
         tabName = "optimization",
-        p("BETA implementation of SimpleMating R package. Currently uses real pedigree data but dummy phenotype data. Do not use for actual decision making"),
+        p("BETA implementation of", a(href="https://github.com/Resende-Lab/SimpleMating", "SimpleMating R package"), "Currently uses real pedigree data but dummy phenotype data. Do not use for actual decision making"),
         fluidRow(
           box(
             title = "Optimization Parameters",
