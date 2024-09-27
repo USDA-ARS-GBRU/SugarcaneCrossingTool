@@ -23,6 +23,7 @@ library(networkD3)
 library(visNetwork)
 library(SimpleMating)
 library(sortable)
+library(shinyjs)
 
 
 # Include necessary JavaScript libraries
@@ -54,6 +55,7 @@ brapi::ba_check(brap) # should be true, for debugging
 
 ui <- dashboardPage(
   title = "STC",
+  dark = NULL,
 
   ## CONTROLBAR ----
   controlbar = dashboardControlbar(
@@ -63,7 +65,22 @@ ui <- dashboardPage(
   ),
 
   ## HEADER --------
-  header = dashboardHeader(title = "SCT"),
+  header = dashboardHeader(
+    title = "SCT",
+    rightUi = tagList(
+      dropdownMenu(
+        type = "notifications",
+        badgeStatus = NULL,
+        icon = icon("sun"),
+        switchInput(
+          inputId = "dark_mode",
+          label = "Dark Mode",
+          onStatus = "success",
+          offStatus = "danger"
+        )
+      )
+    )
+  ),
 
   ## SIDEBAR ------
   sidebar = dashboardSidebar(
@@ -85,7 +102,7 @@ ui <- dashboardPage(
       "brapipull",
       "Get Flower Inventory Data"
     ),
-    p("Don't forget to push 'Get Flower Inventory Data'", strong("each"), "each time you choose a new date"),
+    p("Don't forget to push 'Get Flower Inventory Data'", strong("each"), "time you choose a new date"),
     sidebarMenu(
       menuItem("Home",
                tabName = "home",
@@ -121,6 +138,71 @@ ui <- dashboardPage(
   ## BODY -----
 
   body = dashboardBody(
+    useShinyjs(),
+    tags$head(
+      tags$style(HTML("
+        .rank-list-container .rank-list-item {
+          color: #333;
+          background-color: #f8f9fa;
+        }
+        .dark-mode .rank-list-container .rank-list-item {
+          color: #f8f9fa;
+          background-color: #343a40;
+        }
+        /* Updated styles for sidebar elements */
+        .dark-mode .main-sidebar {
+          background-color: #343a40 !important;
+        }
+        .dark-mode .main-sidebar .nav-sidebar .nav-item .nav-link,
+        .dark-mode .main-sidebar .nav-sidebar .nav-item .nav-link p,
+        .dark-mode .main-sidebar .brand-text,
+        .dark-mode .main-sidebar .user-panel .info,
+        .dark-mode .sidebar .form-group label,
+        .dark-mode .sidebar p,
+        .dark-mode .sidebar .btn-default,
+        .dark-mode .sidebar .form-control,
+        .dark-mode .sidebar .input-group-text,
+        .dark-mode .sidebar .selectize-input,
+        .dark-mode .sidebar .selectize-dropdown {
+          color: #f8f9fa !important;
+        }
+        .dark-mode .sidebar .form-control,
+        .dark-mode .sidebar .input-group-text,
+        .dark-mode .sidebar .selectize-input,
+        .dark-mode .sidebar .selectize-dropdown {
+          background-color: #454d55 !important;
+          border-color: #6c757d !important;
+        }
+        .dark-mode .sidebar .btn-default {
+          background-color: #454d55 !important;
+          border-color: #6c757d !important;
+        }
+        .dark-mode .sidebar .btn-default:hover {
+          background-color: #5a6268 !important;
+        }
+        /* Styles for optimized crossing plan */
+        .dark-mode .box-body {
+          color: #f8f9fa !important;
+        }
+        .dark-mode .dataTables_wrapper {
+          color: #f8f9fa !important;
+        }
+        .dark-mode .dataTables_wrapper .dataTables_length,
+        .dark-mode .dataTables_wrapper .dataTables_filter,
+        .dark-mode .dataTables_wrapper .dataTables_info,
+        .dark-mode .dataTables_wrapper .dataTables_processing,
+        .dark-mode .dataTables_wrapper .dataTables_paginate {
+          color: #f8f9fa !important;
+        }
+        .dark-mode .dataTables_wrapper .dataTables_paginate .paginate_button {
+          color: #f8f9fa !important;
+        }
+        .dark-mode .dataTables_wrapper .dataTables_paginate .paginate_button.current,
+        .dark-mode .dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
+          color: #333 !important;
+        }
+      "))
+    ),
     tabItems(
 
       ### Home content ----
@@ -553,6 +635,14 @@ server <- function(input, output, session) {
     }
   }
 )
+  })
+
+  observeEvent(input$dark_mode, {
+    if (input$dark_mode) {
+      shinyjs::addClass(selector = "body", class = "dark-mode")
+    } else {
+      shinyjs::removeClass(selector = "body", class = "dark-mode")
+    }
   })
 }
 
