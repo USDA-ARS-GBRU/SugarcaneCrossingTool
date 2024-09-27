@@ -638,11 +638,7 @@ server <- function(input, output, session) {
   })
 
   observeEvent(input$dark_mode, {
-    if (input$dark_mode) {
-      shinyjs::addClass(selector = "body", class = "dark-mode")
-    } else {
-      shinyjs::removeClass(selector = "body", class = "dark-mode")
-    }
+    shinyjs::toggleClass(selector = "body", class = "dark-mode")
   })
 }
 
