@@ -692,14 +692,13 @@ server <- function(input, output, session) {
     })
   })
   
-  # Use inventory data in your app
+
   observe({
     inven_data <- inventory_init()
     if (is.null(inven_data)) {
       output$inventoryStatus <- renderText("No inventory data available. Please select a date and try again.")
     } else {
-      # Process the inventory data as usual
-      # ...
+      
     }
   })
 }
