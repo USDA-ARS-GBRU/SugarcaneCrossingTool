@@ -260,3 +260,20 @@ optimize_crosses <- function(inventory_data, male_parents, female_parents, n_cro
   
   return(list(crosses = crosses, plot = plot))
 }
+
+fetch_pedigree_data <- function(clone) {
+  # This is a placeholder implementation. You should replace this with actual data fetching logic.
+  # For example, you might query a database or use BrAPI calls to get the pedigree information.
+  
+  # For demonstration purposes, let's create some dummy data
+  parents <- c(paste0(clone, "_Parent1"), paste0(clone, "_Parent2"))
+  grandparents <- c(paste0(parents[1], "_Parent1"), paste0(parents[1], "_Parent2"),
+                    paste0(parents[2], "_Parent1"), paste0(parents[2], "_Parent2"))
+  
+  pedigree_data <- data.frame(
+    parent = c(parents, grandparents),
+    child = c(rep(clone, 2), rep(parents, each = 2))
+  )
+  
+  return(pedigree_data)
+}

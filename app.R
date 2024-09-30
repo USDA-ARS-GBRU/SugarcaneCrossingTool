@@ -92,16 +92,15 @@ ui <- dashboardPage(
     
     dateInput(
       "date",
-      "Choose A Date:",
-      value = "2023-10-10"
+      "Choose A Date (mm/dd/yyyy):",
+      value = NULL,
+      format = "mm/dd/yyyy"
     ),
+    actionButton("brapipull", "Get Flower Inventory Data"),
+    textOutput("dateWarning"),
     
     p("for testing, select:", strong("October 10, 2023")),
     
-    actionButton(
-      "brapipull",
-      "Get Flower Inventory Data"
-    ),
     p("Don't forget to push 'Get Flower Inventory Data'", strong("each"), "time you choose a new date"),
     sidebarMenu(
       menuItem("Home",
@@ -639,6 +638,69 @@ server <- function(input, output, session) {
 
   observeEvent(input$dark_mode, {
     shinyjs::toggleClass(selector = "body", class = "dark-mode")
+  })
+
+  # Reactive value to track if data should be pulled
+  data_pull_trigger <- reactiveVal(FALSE)
+  
+  # Reset data_pull_trigger when date changes
+  observeEvent(input$date, {
+    data_pull_trigger(FALSE)
+  })
+  
+  # Validate date and set data_pull_trigger when button is clicked
+  observeEvent(input$brapipull, {
+    if (is.null(input$date)) {
+      showNotification("Please select a date before getting inventory data.", type = "error")
+      data_pull_trigger(FALSE)
+    } else {
+      data_pull_trigger(TRUE)
+    }
+  })
+  
+  # Show warning if date is not selected
+  output$dateWarning <- renderText({
+    if (is.null(input$date)) {
+      "Please select a date before getting inventory data."
+    } else {
+      ""
+    }
+  })
+  
+  # Update the inventory_init function
+  inventory_init <- reactive({
+    req(input$date)
+    req(data_pull_trigger())
+    
+    withProgress(message = "Pulling Inventory Data", {
+      tryCatch({
+        inven <- data.frame(brapi::ba_studies_table(con = brap, studyDbId = reactive_iid(), rclass="data.frame")) %>%
+          filter(observationLevel == "plant") %>%
+          set_names(~(.)%>% str_replace_all("SUGARCANE.*","") %>% str_replace_all("\\.","")) %>%
+          filter(FloweringTime == format(input$date, "%Y-%m-%d")) %>%
+          select(germplasmName, germplasmDbId, SexMFWM) %>%
+          group_by(germplasmName, germplasmDbId, SexMFWM) %>%
+          summarise(count = n()) %>%
+          rename(Clone = germplasmName, FloweringCount = count, Sex = SexMFWM)
+        dataSource("Data pulled from BrAPI")
+        inven
+      }, error = function(e) {
+        dataSource("Error occurred while pulling data")
+        showNotification("Error occurred while pulling data. Please try again.", type = "error")
+        NULL
+      })
+    })
+  })
+  
+  # Use inventory data in your app
+  observe({
+    inven_data <- inventory_init()
+    if (is.null(inven_data)) {
+      output$inventoryStatus <- renderText("No inventory data available. Please select a date and try again.")
+    } else {
+      # Process the inventory data as usual
+      # ...
+    }
   })
 }
 
