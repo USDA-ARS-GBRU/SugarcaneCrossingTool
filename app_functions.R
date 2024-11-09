@@ -65,9 +65,9 @@ InitCrossTable <- function(cross_list, Cross.Name="Cross.Unique.ID", Female.Pare
   cross_table$total.crosses<-apply(cross_table, 1, function(x) {length(x$Cross.Unique.ID)})
   
   #cleanup
-  colnames(cross_table)<-c("Female.Parent", "Male.Parent", "Cross.Names", "Total.Number.of.Progenies", "Seed.Quantity.grams", "Number.of.Crosses")    
+  colnames(cross_table)<-c("Female.Parent", "Male.Parent", "Total.Number.of.Progenies", "Seed.Quantity.grams", "Number.of.Crosses", "Cross.Names")    
   
-  cross_table<-cross_table[,c(1:2, 4:6, 3)]
+  cross_table<-cross_table[,c(1:2, 3:6)]
     
   return(cross_table)
 

@@ -263,13 +263,13 @@ ui <- dashboardPage(
               ),
               column(
                 width = 4,
-                h4("Male Parents"),
-                uiOutput("male_parents")
+                h4("Female Parents"),
+                uiOutput("female_parents")
               ),
               column(
                 width = 4,
-                h4("Female Parents"),
-                uiOutput("female_parents")
+                h4("Male Parents"),
+                uiOutput("male_parents")
               )
             )
           )
