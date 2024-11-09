@@ -7,10 +7,10 @@ flowering_server <- function(input, output, session, reactive_date, reactive_iid
         filter(observationLevel == "plant") %>% # select just plant rows
         set_names(~(.)%>% str_replace_all("SUGARCANE.*","") %>% str_replace_all("\\.","")) %>%  # take CO term out of colnames
         filter(FloweringTime== reactive_date()) %>% 
-        select(germplasmName, germplasmDbId, SexMFWM) %>% 
-        group_by(germplasmName, germplasmDbId, SexMFWM) %>% 
+        #select(germplasmName, germplasmDbId, SexMFWM) %>% 
+        group_by(germplasmName, germplasmDbId) %>% 
         summarise(count = n()) %>%
-        rename(Clone = germplasmName, FloweringCount = count, Sex = SexMFWM)
+        rename(Clone = germplasmName, FloweringCount = count)
       dataSource("Data pulled from BrAPI")
       inven
     }, error = function(e) {

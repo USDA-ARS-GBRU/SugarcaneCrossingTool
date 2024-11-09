@@ -21,6 +21,7 @@ library(tis)
 library(fresh)
 library(networkD3)
 library(visNetwork)
+library(bslib)
 library(SimpleMating)
 library(sortable)
 library(shinyjs)
@@ -54,6 +55,8 @@ brapi::ba_check(brap) # should be true, for debugging
 # USER INTERFACE  -------------------------------------------------------------
 
 ui <- dashboardPage(
+  
+
   title = "STC",
   dark = NULL,
 
@@ -84,30 +87,33 @@ ui <- dashboardPage(
 
   ## SIDEBAR ------
   sidebar = dashboardSidebar(
-    selectInput("location", "Select Location:", choices = location_iid_map),
+    selectInput("location", "Step 1: Select Location", choices = location_iid_map),
     
     #this is kind of confusing. The idea is that multiple breeders might be working at same location (Florida) and they should be able to track crosses independently, even though cane lines are combined
     #so crossesid refers to crosses a specific breeder is making
-    selectInput("crossesid", "Select Breeder", choices=crosses_iid_map), 
+    selectInput("crossesid", "Step 2: Select Breeder", choices=crosses_iid_map), 
     
     dateInput(
       "date",
-      "Choose A Date (mm/dd/yyyy):",
-      value = NULL,
-      format = "mm/dd/yyyy"
+      "Step 3: Choose A Date",
+      value = "2023-10-10"
     ),
     actionButton("brapipull", "Get Flower Inventory Data"),
     textOutput("dateWarning"),
     
     p("for testing, select:", strong("October 10, 2023")),
     
-    p("Don't forget to push 'Get Flower Inventory Data'", strong("each"), "time you choose a new date"),
+    actionButton(
+      "brapipull",
+     strong("Step 4. Get Flower Inventory")
+    ),
+    p("Don't forget to push 'Get Flower Inventory", strong("each"), "each time you choose a new date"),
     sidebarMenu(
       menuItem("Home",
                tabName = "home",
                icon = icon("home")
       ),
-      menuItem("Flowering Inventory",
+      menuItem("Inventory/Sorting",
                tabName = "flowering",
                icon = icon("seedling")
       ),
@@ -123,7 +129,7 @@ ui <- dashboardPage(
                tabName = "crosses",
                icon = icon("xmark")
       ),
-      menuItem("Cross Optimization",
+      menuItem("(BETA) Cross Optimization",
                tabName = "optimization",
                icon = icon("dna")
       ),
@@ -209,30 +215,82 @@ ui <- dashboardPage(
         tabName = "home",
         
         h1("Sugarcane Integrated Breeding System (SIBS) Sugarcane Crossing Tool (SCT)"),
-        p("Welcome SCT! Click", a(href="https://github.com/USDA-ARS-GBRU/SugarcaneCrossingTool", "here"), "for instructions."),
+        p("Welcome to SCT! To use this app, follow the instructions below:"),
+        p("* Start by loggin in: from the sidebar on the left, (1) select a location and (2) breeder name."),
+        p("* Then, chose an (3) inventory date."),
+        p("* Next, (4) Click on the 'Get Flower Inventory' button"),
+        p("* After that, move to the Flowering Inventory tab to view your data and sort flowering clones by gender"),
+        p("* You can then click on other tabs to explore related breeding data"),
+        p("Follow ", a(href="https://github.com/USDA-ARS-GBRU/SugarcaneCrossingTool", "this link"), " to the github repo for detailed instructions."),
        
-        h1("Login information"),
+        card(
+          
+        card_header("Login Information"),
+        
         
         p("You've logged in to view inventory for this location: "),
         
-        textOutput("inventoryPointer"),
+        span(textOutput("inventoryPointer"), style="color:blue"),
         
         br(),
         
-        p("You've logged in as:"),
+        p("You've logged in as User:"),
         
-        textOutput("crossPointer")
-      ),
+        span(textOutput("crossPointer"), style="color:blue")),
+        
+        card(
+          card_header("Inventory Information"),
+          
+          p("You're viewing inventory for this day:"),
+          span(textOutput("datePointer"), style="color:blue"))),
 
-      ### Flowering tab content -----
+      ### Inventory content -----
       tabItem(
         tabName = "flowering",
+        
         fluidRow(
-          box(p("This table shows you the count and sex of each clone that is flowering on the day you selected.")),
-          textOutput("dataSourceText"),
-          DTOutput("inventoryTable")
-        )
-      ),
+       
+     
+          box(
+            title = "Step 5: Sorting",
+            p("Drag and drop the available flowering clones into their appropriate category.", strong("Only"), "sorted clones will be displayed in subsequent tabs and/or used in cross prediction so this step must be done first."),
+            width = 12,
+            fluidRow(
+              column(
+                width = 4,
+                h4("Available Clones"),
+                uiOutput("available_clones")
+              ),
+              column(
+                width = 4,
+                h4("Male Parents"),
+                uiOutput("male_parents")
+              ),
+              column(
+                width = 4,
+                h4("Female Parents"),
+                uiOutput("female_parents")
+              )
+            )
+          )
+        ),
+     
+
+        box(title="This table shows you the raw data for the sorting you did above.",
+             textOutput("dataSourceText"),
+            width=12,
+            fluidRow(
+              column(
+                width=4, 
+                DTOutput("inventoryTable"),
+              )
+            )),
+        
+       
+
+
+        
+         ),
 
       ### Pedigree tab content ----
 
@@ -244,25 +302,32 @@ ui <- dashboardPage(
             "Pedigree Table",
             fluidRow(
               box(
+                title="Basic Pedigree Information",
+                width=12,
                 actionButton(
                   inputId = "makepedigree",
                   label = "Get Pedigree Data"
                 ),
-                p("This table shows you the pedigree of each clone that is flowering on the date you selected, 
-                  as well as the number of progeny it produced and its relatedness (0-1+) to LCP85-384.")
+                p("This table shows you the pedigree of each", strong("sorted"), "and flowering clone and the number of progeny it produced")
               ),
               DTOutput("pedigreeTable"),
             )
           ),
           tabPanel(
             "Relationship Matrix",
-            box(p("This is a relationship matrix of the clones that are flowering on the date you selected. Values closer to one indicate high relatedness. You can zoom in to particular regions of the matrix.")),
+            box(
+              title="Relationship Heatmap",
+              width=12,
+              p("This is a relationship matrix of the flowering clones. Values closer to one indicate high relatedness. You can zoom in to particular regions of the matrix.")),
             plotlyOutput("pedigreeMatrix")
           ),
           tabPanel(
             "Visualize Pedigrees",
             fluidRow(
               box(
+                title="Pedigree Trees",
+                p("You can select clones from the drop-down menu to see their pedigree. Note- future work will allow you to select how many generations you want to see"),
+                width=12,
                 uiOutput("cloneDropdown"),
                 visNetworkOutput("pedigreeGraph")
               )
@@ -280,12 +345,16 @@ ui <- dashboardPage(
             "Performance Table",
             fluidRow(
               box(
+                width=12,
                 actionButton(
                   inputId = "makeperformance",
                   label = "Get Performance Data"
                 ),
                 p("This table shows the mean and sd of the performance for each clone 
-                  that is flowering on the date you selected. Once data has been pulled from the database, you will be able to select traits to view using the drop-down menu. This step may take several minutes, please be patient."),
+                  that is flowering on the date you selected. Once data has been pulled from the database, you will be able to select traits to view using the drop-down menu. This step may take several minutes, please be patient.", 
+                  strong("Note, this data is very roughly averaged, please interpret with caution.")),
+                
+                
                 # stuff for what phenotype to select
                 uiOutput(outputId = "colSelect"), # render html list output
                 actionButton("selectCol", "View Selected Data")
@@ -297,6 +366,7 @@ ui <- dashboardPage(
             "Trait Scatter Plot",
             fluidRow(
               box(
+                width=12,
                 uiOutput("scatterPlotDropdown_x"),
                 uiOutput("scatterPlotDropdown_y"),
                 plotlyOutput("traitScatterPlot")
@@ -311,12 +381,13 @@ ui <- dashboardPage(
         tabName = "crosses",
         fluidRow(
           box(
+            title="Previous crosses made with selected clones",
+            width=12,
             actionButton(
               inputId = "makecrosses",
               label = "Get Data on Previous Crosses and Seedlots"
             ),
-            p("This table shows a count of previous crosses that could be made with the clones that are flowering today and the summed number of progeny produced from those crosses. 
-              It also shows you the availability of exisiting seedlots for the crosses that could be made today.
+            p("This table shows a count of", strong("previous"), "made with your selected clones. It also shows the total number of progeny and availablity of seedlots for these crosses. This table is filtered based on categorizatons made in step 5.
               If the cross was made earlier this year, the 'Progeny.Per.Cross' column will read 'None yet, new cross this year'.")
           )
         ),
@@ -348,29 +419,7 @@ ui <- dashboardPage(
       ### Cross Optimization tab content ----
       tabItem(
         tabName = "optimization",
-        fluidRow(
-          box(
-            title = "Select Parents",
-            width = 12,
-            fluidRow(
-              column(
-                width = 4,
-                h4("Available Clones"),
-                uiOutput("available_clones")
-              ),
-              column(
-                width = 4,
-                h4("Male Parents"),
-                uiOutput("male_parents")
-              ),
-              column(
-                width = 4,
-                h4("Female Parents"),
-                uiOutput("female_parents")
-              )
-            )
-          )
-        ),
+        p("BETA implementation of", a(href="https://github.com/Resende-Lab/SimpleMating", "SimpleMating R package"), "Currently uses real pedigree data but dummy phenotype data. Do not use for actual decision making"),
         fluidRow(
           box(
             title = "Optimization Parameters",
@@ -480,7 +529,6 @@ server <- function(input, output, session) {
   reactive_iid <- reactive({
     as.character(input$location)
   })
-  
   # Reactive value for selected cross ID
   reactive_cid <- reactive({as.character(input$crossesid)})
   
@@ -490,10 +538,10 @@ server <- function(input, output, session) {
   })
   
   # Call the server functions from separate files
-  inventory_init <- flowering_server(input, output, session, reactive_date, reactive_iid, dataSource)
-  pedigree_server(input, output, session, reactive_iid, selectedClone, inventory_init)
-  performance_server(input, output, session, reactive_iid, rv, rv_trait_scatter, inventory_init)
-  crosses_server(input, output, session, reactive_cid, inventory_init)
+  inventory_init <- flowering_server(input, output, session, reactive_date, reactive_iid, dataSource )
+  pedigree_server(input, output, session, reactive_iid, selectedClone, inventory_init, clone_assignments)
+  performance_server(input, output, session, reactive_iid, rv, rv_trait_scatter, inventory_init, clone_assignments)
+  crosses_server(input, output, session, reactive_cid, inventory_init,clone_assignments)
   download_page_server(input, output, session, reactive_date)
   
   # Output for inventory pointer
@@ -501,7 +549,6 @@ server <- function(input, output, session) {
     location <- names(location_iid_map)[location_iid_map == input$location]
     paste("Location:", location, "-", unique(brapi::ba_studies_table(con = brap, studyDbId = input$location)$studyName))
   })
-
   # Output for cross pointer
   output$crossPointer <- renderText({
     validate(
@@ -512,6 +559,17 @@ server <- function(input, output, session) {
     
     
   })
+
+  #output for inventory date pointer 
+  output$datePointer <- renderText({
+    # validate(
+    #   need(input$date != "", "Please chose a date")
+    # )
+    
+    paste(as.character(input$date))
+    
+  })
+    
  # Reactive value to store the current state of clone assignments
   clone_assignments <- reactiveVal(list(available = character(), male = character(), female = character()))
   
@@ -634,75 +692,10 @@ server <- function(input, output, session) {
     }
   }
 )
-  })
 
-  observeEvent(input$dark_mode, {
-    shinyjs::toggleClass(selector = "body", class = "dark-mode")
-  })
-
-  # Reactive value to track if data should be pulled
-  data_pull_trigger <- reactiveVal(FALSE)
-  
-  # Reset data_pull_trigger when date changes
-  observeEvent(input$date, {
-    data_pull_trigger(FALSE)
-  })
-  
-  # Validate date and set data_pull_trigger when button is clicked
-  observeEvent(input$brapipull, {
-    if (is.null(input$date)) {
-      showNotification("Please select a date before getting inventory data.", type = "error")
-      data_pull_trigger(FALSE)
-    } else {
-      data_pull_trigger(TRUE)
-    }
-  })
-  
-  # Show warning if date is not selected
-  output$dateWarning <- renderText({
-    if (is.null(input$date)) {
-      "Please select a date before getting inventory data."
-    } else {
-      ""
-    }
-  })
-  
-  # Update the inventory_init function
-  inventory_init <- reactive({
-    req(input$date)
-    req(data_pull_trigger())
-    
-    withProgress(message = "Pulling Inventory Data", {
-      tryCatch({
-        inven <- data.frame(brapi::ba_studies_table(con = brap, studyDbId = reactive_iid(), rclass="data.frame")) %>%
-          filter(observationLevel == "plant") %>%
-          set_names(~(.)%>% str_replace_all("SUGARCANE.*","") %>% str_replace_all("\\.","")) %>%
-          filter(FloweringTime == format(input$date, "%Y-%m-%d")) %>%
-          select(germplasmName, germplasmDbId, SexMFWM) %>%
-          group_by(germplasmName, germplasmDbId, SexMFWM) %>%
-          summarise(count = n()) %>%
-          rename(Clone = germplasmName, FloweringCount = count, Sex = SexMFWM)
-        dataSource("Data pulled from BrAPI")
-        inven
-      }, error = function(e) {
-        dataSource("Error occurred while pulling data")
-        showNotification("Error occurred while pulling data. Please try again.", type = "error")
-        NULL
-      })
-    })
-  })
-  
-
-  observe({
-    inven_data <- inventory_init()
-    if (is.null(inven_data)) {
-      output$inventoryStatus <- renderText("No inventory data available. Please select a date and try again.")
-    } else {
-      
-    }
   })
 }
 
 # Run the Shiny app
-shinyApp(ui, server)
+shinyApp(ui, server) 
   
