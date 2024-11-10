@@ -198,11 +198,11 @@ optimize_crosses <- function(inventory_data, male_parents, female_parents, n_cro
     Trait2 = dummy_blup2
   )
   
-  # Create a dummy relationship matrix (you can replace this with pedmatrix_init() when available)
+  # Create a dummy relationship matrix
   dummy_K <- matrix(runif(n_parents^2, 0, 1), nrow = n_parents, ncol = n_parents)
   rownames(dummy_K) <- colnames(dummy_K) <- selected_parents
   
-  # Create custom crossing plan
+  # Create custom crossing plan ensuring females and males are correctly assigned
   cross_plan <- SimpleMating::planCross(TargetPop = female_parents, TargetPop2 = male_parents)
   
   # Debug print
@@ -213,9 +213,9 @@ optimize_crosses <- function(inventory_data, male_parents, female_parents, n_cro
   # Predict mid-parent average
   tryCatch({
     mpa <- SimpleMating::getMPA(MatePlan = cross_plan,
-                                Criterion = dummy_blups,
-                                K = dummy_K,
-                                Weights = c(0.5, 0.5))
+                               Criterion = dummy_blups,
+                               K = dummy_K,
+                               Weights = c(0.5, 0.5))
     
     # Debug print
     print("MPA calculation successful")
@@ -223,9 +223,6 @@ optimize_crosses <- function(inventory_data, male_parents, female_parents, n_cro
     
   }, error = function(e) {
     print(paste("Error in MPA calculation:", e$message))
-    print("Debugging information:")
-    print(paste("Dimensions of Criterion:", paste(dim(dummy_blups), collapse = "x")))
-    print(paste("Dimensions of K:", paste(dim(dummy_K), collapse = "x")))
     return(NULL)
   })
   
@@ -236,10 +233,16 @@ optimize_crosses <- function(inventory_data, male_parents, female_parents, n_cro
   # Select crosses
   tryCatch({
     optimized_plan <- SimpleMating::selectCrosses(data = mpa,
-                                                  n.cross = n_crosses,
-                                                  max.cross = max_crosses_per_parent,
-                                                  min.cross = min_crosses_per_parent,
-                                                  culling.pairwise.k = culling_k)
+                                                 n.cross = n_crosses,
+                                                 max.cross = max_crosses_per_parent,
+                                                 min.cross = min_crosses_per_parent,
+                                                 culling.pairwise.k = culling_k)
+    
+    # Rename columns in the crosses data frame
+    if (!is.null(optimized_plan[[2]])) {
+      colnames(optimized_plan[[2]])[colnames(optimized_plan[[2]]) == "Parent1"] <- "Female.Parent"
+      colnames(optimized_plan[[2]])[colnames(optimized_plan[[2]]) == "Parent2"] <- "Male.Parent"
+    }
     
     # Debug print
     print("Cross selection successful")
