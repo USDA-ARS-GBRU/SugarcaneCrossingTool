@@ -211,42 +211,37 @@ optimize_crosses <- function(inventory_data, male_parents, female_parents, n_cro
   print(paste("Number of crosses:", nrow(cross_plan)))
   
   # Predict mid-parent average
-  tryCatch({
-    mpa <- SimpleMating::getMPA(MatePlan = cross_plan,
-                               Criterion = dummy_blups,
-                               K = dummy_K,
-                               Weights = c(0.5, 0.5))
-    
-    # Debug print
-    print("MPA calculation successful")
-    print(paste("Number of MPA entries:", nrow(mpa)))
-    
+  mpa <- tryCatch({
+    SimpleMating::getMPA(MatePlan = cross_plan,
+                        Criterion = dummy_blups,
+                        K = dummy_K,
+                        Weights = c(0.5, 0.5))
   }, error = function(e) {
     print(paste("Error in MPA calculation:", e$message))
     return(NULL)
   })
   
   if (is.null(mpa)) {
-    return(list(crosses = data.frame(), plot = NULL))
+    return(list(crosses = data.frame(Message = "Error in MPA calculation"), plot = NULL))
   }
   
   # Select crosses
-  tryCatch({
-    optimized_plan <- SimpleMating::selectCrosses(data = mpa,
-                                                 n.cross = n_crosses,
-                                                 max.cross = max_crosses_per_parent,
-                                                 min.cross = min_crosses_per_parent,
-                                                 culling.pairwise.k = culling_k)
+  optimized_plan <- tryCatch({
+    plan <- SimpleMating::selectCrosses(data = mpa,
+                                      n.cross = n_crosses,
+                                      max.cross = max_crosses_per_parent,
+                                      min.cross = min_crosses_per_parent,
+                                      culling.pairwise.k = culling_k)
     
-    # Rename columns in the crosses data frame
-    if (!is.null(optimized_plan[[2]])) {
-      colnames(optimized_plan[[2]])[colnames(optimized_plan[[2]]) == "Parent1"] <- "Female.Parent"
-      colnames(optimized_plan[[2]])[colnames(optimized_plan[[2]]) == "Parent2"] <- "Male.Parent"
+    if (is.null(plan) || length(plan) < 2 || is.null(plan[[2]])) {
+      return(NULL)
     }
     
-    # Debug print
-    print("Cross selection successful")
-    print(paste("Number of selected crosses:", nrow(optimized_plan[[2]])))
+    # Rename columns in the crosses data frame
+    colnames(plan[[2]])[colnames(plan[[2]]) == "Parent1"] <- "Female.Parent"
+    colnames(plan[[2]])[colnames(plan[[2]]) == "Parent2"] <- "Male.Parent"
+    
+    plan
     
   }, error = function(e) {
     print(paste("Error in cross selection:", e$message))
@@ -254,7 +249,12 @@ optimize_crosses <- function(inventory_data, male_parents, female_parents, n_cro
   })
   
   if (is.null(optimized_plan)) {
-    return(list(crosses = data.frame(), plot = NULL))
+    return(list(
+      crosses = data.frame(
+        Message = "No valid crosses found. Try adjusting the culling parameter or increasing the number of parents."
+      ), 
+      plot = NULL
+    ))
   }
   
   # Prepare output

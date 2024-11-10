@@ -426,7 +426,8 @@ ui <- dashboardPage(
             numericInput("n_crosses", "Number of Crosses to Select:", 10, min = 1, max = 100),
             numericInput("max_crosses_per_parent", "Max Crosses per Parent:", 3, min = 1, max = 10),
             numericInput("min_crosses_per_parent", "Min Crosses per Parent:", 1, min = 0, max = 5),
-            numericInput("culling_k", "Culling Pairwise K:", 1, min = 0, max = 2, step = 0.1),
+            sliderInput("culling_k", "Culling Pairwise K:", 
+                       min = 0, max = 1, value = 1, step = 0.05),
             numericInput("prop_sel", "Proportion to Select:", 0.05, min = 0.01, max = 0.5, step = 0.01),
             actionButton("run_optimization", "Run Optimization")
           ),
