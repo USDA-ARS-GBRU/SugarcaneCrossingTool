@@ -237,9 +237,10 @@ optimize_crosses <- function(inventory_data, male_parents, female_parents, n_cro
       return(NULL)
     }
     
-    # Rename columns in the crosses data frame
-    colnames(plan[[2]])[colnames(plan[[2]]) == "Parent1"] <- "Female.Parent"
-    colnames(plan[[2]])[colnames(plan[[2]]) == "Parent2"] <- "Male.Parent"
+    # Rename columns and round Y and K values
+    plan[[2]] <- plan[[2]] %>%
+      rename(Female.Parent = Parent1, Male.Parent = Parent2) %>%
+      mutate(across(c(Y, K), ~round(., 3)))
     
     plan
     
