@@ -99,7 +99,7 @@ ui <- dashboardPage(
       value = "2023-10-10"
     ),
     actionButton("brapipull", "Get Flower Inventory Data"),
-    textOutput("dateWarning"),
+    textOutput("dateWarning"), 
     
     p("for testing, select:", strong("October 10, 2023")),
     
@@ -428,7 +428,8 @@ ui <- dashboardPage(
             numericInput("min_crosses_per_parent", "Min Crosses per Parent:", 1, min = 0, max = 5),
             sliderInput("culling_k", "Culling Pairwise K:", 
                        min = 0, max = 1, value = 1, step = 0.05),
-            numericInput("prop_sel", "Proportion to Select:", 0.05, min = 0.01, max = 0.5, step = 0.01),
+            sliderInput("prop_sel", "Proportion to Select:", 
+                       min = 0, max = 1, value = 0.05, step = 0.01),
             actionButton("run_optimization", "Run Optimization")
           ),
           box(
