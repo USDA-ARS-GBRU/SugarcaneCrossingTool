@@ -428,8 +428,6 @@ ui <- dashboardPage(
             numericInput("min_crosses_per_parent", "Min Crosses per Parent:", 1, min = 0, max = 5),
             sliderInput("culling_k", "Culling Pairwise K:", 
                        min = 0, max = 1, value = 1, step = 0.05),
-            sliderInput("prop_sel", "Proportion to Select:", 
-                       min = 0, max = 1, value = 0.05, step = 0.01),
             actionButton("run_optimization", "Run Optimization")
           ),
           box(
@@ -534,6 +532,12 @@ server <- function(input, output, session) {
   # Reactive value for selected cross ID
   reactive_cid <- reactive({as.character(input$crossesid)})
   
+  # Add reactiveValues for sharing data between modules
+  rv <- reactiveValues(
+    previous_crosses = NULL,
+    selectedColumns = NULL
+  )
+  
   # Add the renderText for dataSourceText
   output$dataSourceText <- renderText({
     dataSource()
@@ -543,7 +547,7 @@ server <- function(input, output, session) {
   inventory_init <- flowering_server(input, output, session, reactive_date, reactive_iid, dataSource )
   pedigree_server(input, output, session, reactive_iid, selectedClone, inventory_init, clone_assignments)
   performance_server(input, output, session, reactive_iid, rv, rv_trait_scatter, inventory_init, clone_assignments)
-  crosses_server(input, output, session, reactive_cid, inventory_init,clone_assignments)
+  crosses_server(input, output, session, reactive_cid, inventory_init, clone_assignments, rv)
   download_page_server(input, output, session, reactive_date)
   
   # Output for inventory pointer
@@ -654,8 +658,7 @@ server <- function(input, output, session) {
                        n_crosses = input$n_crosses,
                        max_crosses_per_parent = input$max_crosses_per_parent,
                        min_crosses_per_parent = input$min_crosses_per_parent,
-                       culling_k = input$culling_k,
-                       prop_sel = input$prop_sel)
+                       culling_k = input$culling_k)
     }, error = function(e) {
       showNotification(paste("Error in optimization:", e$message), type = "error")
       return(list(crosses = data.frame(), plot = NULL))
@@ -664,9 +667,22 @@ server <- function(input, output, session) {
     # Display results
     output$optimized_crosses_table <- renderDT({
       if (!is.null(optimized_crosses$crosses) && nrow(optimized_crosses$crosses) > 0) {
-        datatable(optimized_crosses$crosses, options = list(pageLength = 10))
+        # Join with previous crosses if available
+        if (!is.null(rv$previous_crosses)) {
+          optimized_crosses$crosses <- optimized_crosses$crosses %>%
+            left_join(rv$previous_crosses, 
+                     by = c("Female.Parent", "Male.Parent"))
+        }
+        
+        datatable(optimized_crosses$crosses, 
+                 options = list(
+                   scrollX = TRUE,
+                   fixedColumns = list(leftColumns = 2),
+                   pageLength = 10
+                 ))
       } else {
-        datatable(data.frame(Message = "No crosses found or error occurred"), options = list(pageLength = 10))
+        datatable(data.frame(Message = "No crosses found or error occurred"), 
+                 options = list(pageLength = 10))
       }
     })
     

@@ -1,5 +1,5 @@
 #Crosses.R
-crosses_server <- function(input, output, session, reactive_cid, inventory_init,clone_assignments) {
+crosses_server <- function(input, output, session, reactive_cid, inventory_init, clone_assignments, rv) {
   
   
 # Event reactive that triggers when the "makecrosses" input is clicked
@@ -35,8 +35,12 @@ crosses_init <- eventReactive(input$makecrosses, withProgress(message = "Pulling
    all_cross_table<-all_cross_table[which(all_cross_table$Female.Parent%in%display_female)&which(all_cross_table$Male.Parent%in%display_male),]   
     
     # Order the combined cross table based on the second and first columns
+    all_cross_table <- all_cross_table[order(all_cross_table[, 2], all_cross_table[, 1]), ]
     
-    return(all_cross_table[order(all_cross_table[, 2], all_cross_table[, 1]), ])
+    # Store in reactiveValues for access by other modules
+    rv$previous_crosses <- all_cross_table
+    
+    return(all_cross_table)
     
     
     
