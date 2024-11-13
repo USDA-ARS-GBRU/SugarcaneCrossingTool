@@ -206,6 +206,55 @@ ui <- dashboardPage(
         .dark-mode .dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
           color: #333 !important;
         }
+        /* Consistent tab styling */
+        .nav-tabs .nav-link.active {
+          background-color: #007bff !important;
+          color: #ffffff !important;
+          border-color: #007bff !important;
+        }
+
+        .nav-tabs .nav-link {
+          color: #007bff !important;
+        }
+
+        .nav-tabs .nav-link:hover:not(.active) {
+          border-color: #e9ecef #e9ecef #dee2e6;
+          color: #0056b3 !important;
+        }
+
+        /* Ensure sidebar consistency */
+        .nav-sidebar .nav-item .nav-link.active {
+          background-color: #007bff !important;
+          color: #ffffff !important;
+        }
+
+        .nav-sidebar .nav-item .nav-link {
+          color: #333333 !important;  /* Changed to black */
+        }
+
+        .nav-sidebar .nav-item .nav-link:hover:not(.active) {
+          color: #007bff !important;
+        }
+
+        /* Dark mode compatibility */
+        .dark-mode .nav-tabs .nav-link.active {
+          background-color: #375a7f !important;
+          color: #ffffff !important;
+          border-color: #375a7f !important;
+        }
+
+        .dark-mode .nav-tabs .nav-link {
+          color: #375a7f !important;
+        }
+
+        .dark-mode .nav-sidebar .nav-item .nav-link.active {
+          background-color: #375a7f !important;
+          color: #ffffff !important;
+        }
+
+        .dark-mode .nav-sidebar .nav-item .nav-link {
+          color: #f8f9fa !important;  /* Keep light color for dark mode */
+        }
       "))
     ),
     tabItems(
@@ -658,7 +707,8 @@ server <- function(input, output, session) {
                        n_crosses = input$n_crosses,
                        max_crosses_per_parent = input$max_crosses_per_parent,
                        min_crosses_per_parent = input$min_crosses_per_parent,
-                       culling_k = input$culling_k)
+                       culling_k = input$culling_k,
+                       prop_sel = input$prop_sel)
     }, error = function(e) {
       showNotification(paste("Error in optimization:", e$message), type = "error")
       return(list(crosses = data.frame(), plot = NULL))
