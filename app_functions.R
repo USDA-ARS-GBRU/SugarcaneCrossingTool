@@ -179,8 +179,10 @@ createPedigreeGraph <- function(data, selected_clone_id = NULL) {
   }
 }
 
-optimize_crosses <- function(inventory_data, male_parents, female_parents, n_crosses, max_crosses_per_parent, culling_k, prop_sel, blup, amat) {
-  # Filter inventory data for selected parents
+optimize_crosses <- function(inventory_data, male_parents, female_parents, n_crosses, max_crosses_per_parent, culling_k, prop_sel, blup, amat, weights) {
+ stopifnot((sum(weights)-1)<0.1)
+
+   # Filter inventory data for selected parents
   selected_parents <- c(male_parents, female_parents)
   filtered_inventory <- inventory_data[inventory_data$Clone %in% selected_parents, ]
   
@@ -218,7 +220,7 @@ optimize_crosses <- function(inventory_data, male_parents, female_parents, n_cro
     SimpleMating::getMPA(MatePlan = cross_plan,
                         Criterion = blup[,1:4],
                         K = amat,
-                        Weights = c(1/3,1/3,1/3))
+                        Weights = weights)
   }, error = function(e) {
     print(paste("Error in MPA calculation:", e$message))
     return(NULL)

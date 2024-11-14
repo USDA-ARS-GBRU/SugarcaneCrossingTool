@@ -468,7 +468,7 @@ ui <- dashboardPage(
       ### Cross Optimization tab content ----
       tabItem(
         tabName = "optimization",
-        p("BETA implementation of", a(href="https://github.com/Resende-Lab/SimpleMating", "SimpleMating R package"), "Currently uses real pedigree data but dummy phenotype data. Do not use for actual decision making"),
+        p("BETA implementation of", a(href="https://github.com/Resende-Lab/SimpleMating", "SimpleMating R package"), "This optimizes the midparent value of potential cross combinations based on a weighted selection index of parental BVs. Breeding values were predicted from S4 trial data and a pedigree relationship matrix. Potential crosses are culled based on pairwise-K value (where value of K is proportional to relatedness."),
         fluidRow(
           box(
             title = "Optimization Parameters",
@@ -477,6 +477,14 @@ ui <- dashboardPage(
             #numericInput("min_crosses_per_parent", "Min Crosses per Parent:", 1, min = 0, max = 5),
             sliderInput("culling_k", "Culling Pairwise K:", 
                        min = 0, max = 1, value = 1, step = 0.05),
+            
+            p(strong("Trait Weights:")),
+            p("Sum of weights must equal 1."),
+            numericInput(inputId="brix", label="Average Brix", value = round(1/3,1)),
+            numericInput(inputId="biomass", label="Total Biomass", value = round(1/3,1)),
+            numericInput(inputId="ratoon", label="Ratooning Ability", value = round(1/3,1)),
+            
+            
             actionButton("run_optimization", "Run Optimization")
           ),
           box(
@@ -711,7 +719,8 @@ server <- function(input, output, session) {
                        culling_k = input$culling_k,
                        prop_sel = input$prop_sel,
                        blup=blup_data[,1:4],
-                       amat=as.matrix(parent_amat))
+                       amat=as.matrix(parent_amat),
+                       weights=c(input$brix, input$biomass, input$ratoon))
     }, error = function(e) {
       showNotification(paste("Error in optimization:", e$message), type = "error")
       return(list(crosses = data.frame(), plot = NULL))
