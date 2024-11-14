@@ -504,7 +504,7 @@ ui <- dashboardPage(
           box(
             title = "Optimization Results",
             width = 12,
-            plotOutput("optimization_plot"),
+            plotlyOutput("optimization_plot"),
             verbatimTextOutput("optimization_summary")
           )
         )
@@ -739,6 +739,15 @@ server <- function(input, output, session) {
 
   # Run optimization when button is clicked
   observeEvent(input$run_optimization, {
+    req(input$culling_k)
+    
+    # Validate weights before running optimization
+    total_weight <- input$weight_biomass + input$weight_ratooning + input$weight_brix
+    if(abs(total_weight - 1) > 0.01) {
+      showNotification("Error: Trait weights must sum to 1", type = "error")
+      return()
+    }
+    
     tryCatch({
       optimized_crosses <- optimize_crosses(
         inventory_data = NULL,
@@ -746,28 +755,29 @@ server <- function(input, output, session) {
         female_parents = clone_assignments()$female,
         performance_data = performance_data(),
         A_matrix = read.csv("ParentAmatrix.csv", row.names = 1),
+        previous_crosses = rv$previous_crosses,
         n_crosses = input$n_crosses,
         max_crosses_per_parent = input$max_crosses_per_parent,
         min_crosses_per_parent = input$min_crosses_per_parent,
         weights = c(input$weight_biomass, 
                    input$weight_ratooning, 
                    input$weight_brix),
-        culling_k = input$culling_k
+        culling_k = as.numeric(input$culling_k)
       )
       
-      if(!is.null(optimized_crosses)) {
-        output$optimized_crosses_table <- renderDT({
-          datatable(optimized_crosses$crosses)
-        })
-        
-        output$optimization_plot <- renderPlot({
-          optimized_crosses$plot
-        })
-        
-        output$optimization_summary <- renderPrint({
-          optimized_crosses$summary
-        })
-      }
+      # Render both the plot and the crossing plan table
+      output$optimization_plot <- renderPlotly({
+        optimized_crosses$plot
+      })
+      
+      # Add this new output for the crossing plan table
+      output$crossing_plan <- renderDT({
+        optimized_crosses$crosses %>%
+          select(rank, Female.Parent, Male.Parent, predicted_performance, coancestry,
+                 Seed.Quantity.grams, Number.of.Crosses) %>%
+          arrange(rank)
+      }, options = list(scrollX = TRUE))
+      
     }, error = function(e) {
       showNotification(paste("Error in optimization:", e$message), type = "error")
     })

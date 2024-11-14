@@ -58,17 +58,20 @@ InitCrossTable <- function(cross_list, Cross.Name="Cross.Unique.ID", Female.Pare
   cross_list2<-cross_list2 %>% left_join(seeds, by="Cross.Unique.ID")
   
   #aggregate
-  cross_table<-as.data.frame(aggregate(Cross.Unique.ID ~ Female.Parent + Male.Parent, FUN = c, data = cross_list2)) %>% 
+  cross_table <- as.data.frame(aggregate(Cross.Unique.ID ~ Female.Parent + Male.Parent, FUN = c, data = cross_list2)) %>% 
     left_join(as.data.frame(aggregate(Number.of.Progenies ~ Female.Parent + Male.Parent, FUN = sum, data = cross_list2))) %>% 
-    left_join(  as.data.frame(aggregate(data.amount ~ Female.Parent + Male.Parent, FUN = sum, data = cross_list2)))
+    left_join(as.data.frame(aggregate(data.amount ~ Female.Parent + Male.Parent, FUN = sum, data = cross_list2)))
   
   cross_table$total.crosses<-apply(cross_table, 1, function(x) {length(x$Cross.Unique.ID)})
   
   #cleanup
-  colnames(cross_table)<-c("Female.Parent", "Male.Parent", "Total.Number.of.Progenies", "Seed.Quantity.grams", "Number.of.Crosses", "Cross.Names")    
+  colnames(cross_table) <- c("Female.Parent", "Male.Parent", "Cross.Names", "Total.Number.of.Progenies", "Seed.Quantity.grams")
+  cross_table$Number.of.Crosses <- sapply(cross_table$Cross.Names, length)
   
-  cross_table<-cross_table[,c(1:2, 3:6)]
-    
+  # Reorder columns
+  cross_table <- cross_table[, c("Female.Parent", "Male.Parent", "Total.Number.of.Progenies", 
+                                  "Seed.Quantity.grams", "Number.of.Crosses", "Cross.Names")]
+  
   return(cross_table)
 
   } else {
@@ -180,12 +183,17 @@ createPedigreeGraph <- function(data, selected_clone_id = NULL) {
 }
 
 optimize_crosses <- function(inventory_data, male_parents, female_parents, 
-                           performance_data, A_matrix,
+                           performance_data, A_matrix, previous_crosses,
                            n_crosses = 10, 
                            max_crosses_per_parent = 3, 
                            min_crosses_per_parent = 1, 
                            weights = c(0.33, 0.33, 0.34),
                            culling_k = 1) {
+  
+  # Validate weights sum to approximately 1
+  if(abs(sum(weights) - 1) > 0.01) {
+    stop("Trait weights must sum to 1")
+  }
   
   # Scale the performance data
   performance_data <- performance_data %>%
@@ -220,21 +228,53 @@ optimize_crosses <- function(inventory_data, male_parents, female_parents,
     (performance_index.female + performance_index.male) / 2 * (1 - culling_k * coancestry)
   })
   
-  # Sort and select top crosses
-  selected_crosses <- crossing_matrix %>%
+  # Add rank information
+  crossing_matrix <- crossing_matrix %>%
     arrange(desc(predicted_performance)) %>%
+    mutate(rank = row_number())
+  
+  # Join with previous crosses information if available
+  if (!is.null(previous_crosses)) {
+    crossing_matrix <- crossing_matrix %>%
+      left_join(
+        previous_crosses %>% 
+          select(Female.Parent, Male.Parent, Seed.Quantity.grams, Number.of.Crosses),
+        by = c("Female.Parent", "Male.Parent")
+      )
+  }
+  
+  # Select top crosses
+  selected_crosses <- crossing_matrix %>%
     head(n_crosses)
   
-  # Create visualization
-  plot <- ggplot(crossing_matrix, aes(x = coancestry, y = predicted_performance)) +
+  # Create visualization with hover information and culling threshold line
+  plot <- ggplot(crossing_matrix, 
+         aes(x = coancestry, 
+             y = predicted_performance,
+             text = sprintf(
+               "Rank: %d\nFemale Parent: %s\nMale Parent: %s%s%s",
+               rank,
+               Female.Parent,
+               Male.Parent,
+               ifelse(!is.na(Seed.Quantity.grams), 
+                     sprintf("\nSeed Quantity: %.2f g", Seed.Quantity.grams), 
+                     ""),
+               ifelse(!is.na(Number.of.Crosses), 
+                     sprintf("\nPrevious Crosses: %d", Number.of.Crosses), 
+                     "")
+             ))) +
+    geom_vline(xintercept = culling_k, linetype = "dashed", color = "gray50") +
     geom_point(alpha = 0.5) +
     geom_point(data = selected_crosses, color = "red", size = 3) +
     theme_bw() +
     labs(x = "Coefficient of Coancestry",
          y = "Predicted Performance",
          title = "Cross Performance vs Coancestry",
-         caption = "Red points indicate selected crosses.\nCoancestry > 1 indicates highly inbred parents.") +
+         caption = sprintf("Dashed line shows culling threshold (k = %.2f)", culling_k)) +
     theme(plot.caption = element_text(hjust = 0, size = 10))
+  
+  # Convert to plotly for interactive hover
+  plot <- ggplotly(plot, tooltip = "text")
   
   return(list(
     crosses = selected_crosses,
