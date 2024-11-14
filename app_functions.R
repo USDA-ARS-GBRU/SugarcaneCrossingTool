@@ -179,7 +179,7 @@ createPedigreeGraph <- function(data, selected_clone_id = NULL) {
   }
 }
 
-optimize_crosses <- function(inventory_data, male_parents, female_parents, n_crosses, max_crosses_per_parent, min_crosses_per_parent, culling_k, prop_sel, blup, amat) {
+optimize_crosses <- function(inventory_data, male_parents, female_parents, n_crosses, max_crosses_per_parent, culling_k, prop_sel, blup, amat) {
   # Filter inventory data for selected parents
   selected_parents <- c(male_parents, female_parents)
   filtered_inventory <- inventory_data[inventory_data$Clone %in% selected_parents, ]
@@ -233,7 +233,7 @@ optimize_crosses <- function(inventory_data, male_parents, female_parents, n_cro
     plan <- SimpleMating::selectCrosses(data = mpa,
                                       n.cross = n_crosses,
                                       max.cross = max_crosses_per_parent,
-                                      min.cross = min_crosses_per_parent,
+                                      min.cross = 1,
                                       culling.pairwise.k = culling_k)
     
     if (is.null(plan) || length(plan) < 2 || is.null(plan[[2]])) {
