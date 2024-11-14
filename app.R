@@ -98,7 +98,7 @@ ui <- dashboardPage(
       "Step 3: Choose A Date",
       value = "2023-10-10"
     ),
-    actionButton("brapipull", "Get Flower Inventory Data"),
+    #actionButton("brapipull", "Get Flower Inventory Data"),
     textOutput("dateWarning"), 
     
     p("for testing, select:", strong("October 10, 2023")),
