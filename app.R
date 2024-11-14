@@ -468,26 +468,44 @@ ui <- dashboardPage(
       ### Cross Optimization tab content ----
       tabItem(
         tabName = "optimization",
-        p("BETA implementation of", a(href="https://github.com/Resende-Lab/SimpleMating", "SimpleMating R package"), "Currently uses real pedigree data but dummy phenotype data. Do not use for actual decision making"),
+        p("Implementation of", a(href="https://github.com/Resende-Lab/SimpleMating", "SimpleMating R package"), 
+          "using actual performance data for three key traits: total biomass, ratooning ability, and average brix."),
         fluidRow(
           box(
             title = "Optimization Parameters",
-            numericInput("n_crosses", "Number of Crosses to Select:", 10, min = 1, max = 100),
+            numericInput("n_crosses", "Number of Crosses to Select:", 2, min = 1, max = 100),
             numericInput("max_crosses_per_parent", "Max Crosses per Parent:", 3, min = 1, max = 10),
             numericInput("min_crosses_per_parent", "Min Crosses per Parent:", 1, min = 0, max = 5),
             sliderInput("culling_k", "Culling Pairwise K:", 
-                       min = 0, max = 1, value = 1, step = 0.05),
-            actionButton("run_optimization", "Run Optimization")
+                       min = 0, max = 1, value = 0.3, step = 0.05),
+            actionButton("run_optimization", "Run Optimization", 
+                        class = "btn-primary", 
+                        style = "margin-top: 15px;")
           ),
           box(
+            title = "Trait Weights",
+            sliderInput("weight_biomass", "Total Biomass Weight:", 
+                        min = 0, max = 1, value = 0.4, step = 0.1),
+            sliderInput("weight_ratooning", "Ratooning Ability Weight:", 
+                        min = 0, max = 1, value = 0.3, step = 0.1),
+            sliderInput("weight_brix", "Average Brix Weight:", 
+                        min = 0, max = 1, value = 0.3, step = 0.1),
+            textOutput("weight_warning")
+          )
+        ),
+        fluidRow(
+          box(
             title = "Optimized Crossing Plan",
+            width = 12,
             DTOutput("optimized_crosses_table")
           )
         ),
         fluidRow(
           box(
-            title = "Optimization Visualization",
-            plotOutput("optimization_plot")
+            title = "Optimization Results",
+            width = 12,
+            plotOutput("optimization_plot"),
+            verbatimTextOutput("optimization_summary")
           )
         )
       )
@@ -684,83 +702,75 @@ server <- function(input, output, session) {
     ))
   })
   
-  # Cross Optimization
-  observeEvent(input$run_optimization, {
-    # Get current inventory data
-    inventory_data <- inventory_init()
+  # Load and prepare performance data
+  performance_data <- reactive({
+    data <- read.csv("StageWiseParentBLUPS.csv")
     
-    # Get selected parents
-    male_parents <- clone_assignments()$male
-    female_parents <- clone_assignments()$female
+    # Scale the traits
+    data$totalbiomass_scaled <- scale(data$totalbiomass)
+    data$ratooningability_scaled <- scale(data$ratooningability)
+    data$averagebrix_scaled <- scale(data$averagebrix)
     
-    # Check if parents are selected
-    if (length(male_parents) == 0 || length(female_parents) == 0) {
-      showNotification("Please select both male and female parents before running optimization.", type = "error")
-      return()
+    data
+  })
+
+  # Validate weights sum to 1
+  observe({
+    total_weight <- input$weight_biomass + input$weight_ratooning + input$weight_brix
+    if(abs(total_weight - 1) > 0.01) {
+      output$weight_warning <- renderText({
+        "Warning: Weights should sum to 1"
+      })
+    } else {
+      output$weight_warning <- renderText({
+        ""
+      })
     }
-    
-    # Run optimization
-    optimized_crosses <- tryCatch({
-      optimize_crosses(inventory_data, 
-                       male_parents,
-                       female_parents,
-                       n_crosses = input$n_crosses,
-                       max_crosses_per_parent = input$max_crosses_per_parent,
-                       min_crosses_per_parent = input$min_crosses_per_parent,
-                       culling_k = input$culling_k,
-                       prop_sel = input$prop_sel)
+  })
+
+  # Load data at startup
+  performance_data <- reactive({
+    read.csv("StageWiseParentBLUPS.csv")
+  })
+
+  A_matrix <- reactive({
+    read.csv("ParentAmatrix.csv", row.names = 1)
+  })
+
+  # Run optimization when button is clicked
+  observeEvent(input$run_optimization, {
+    tryCatch({
+      optimized_crosses <- optimize_crosses(
+        inventory_data = NULL,
+        male_parents = clone_assignments()$male,
+        female_parents = clone_assignments()$female,
+        performance_data = performance_data(),
+        A_matrix = read.csv("ParentAmatrix.csv", row.names = 1),
+        n_crosses = input$n_crosses,
+        max_crosses_per_parent = input$max_crosses_per_parent,
+        min_crosses_per_parent = input$min_crosses_per_parent,
+        weights = c(input$weight_biomass, 
+                   input$weight_ratooning, 
+                   input$weight_brix),
+        culling_k = input$culling_k
+      )
+      
+      if(!is.null(optimized_crosses)) {
+        output$optimized_crosses_table <- renderDT({
+          datatable(optimized_crosses$crosses)
+        })
+        
+        output$optimization_plot <- renderPlot({
+          optimized_crosses$plot
+        })
+        
+        output$optimization_summary <- renderPrint({
+          optimized_crosses$summary
+        })
+      }
     }, error = function(e) {
       showNotification(paste("Error in optimization:", e$message), type = "error")
-      return(list(crosses = data.frame(), plot = NULL))
     })
-    
-    # Display results
-    output$optimized_crosses_table <- renderDT({
-      if (!is.null(optimized_crosses$crosses) && nrow(optimized_crosses$crosses) > 0) {
-        # Join with previous crosses if available
-        if (!is.null(rv$previous_crosses)) {
-          optimized_crosses$crosses <- optimized_crosses$crosses %>%
-            left_join(rv$previous_crosses, 
-                     by = c("Female.Parent", "Male.Parent"))
-        }
-        
-        datatable(optimized_crosses$crosses, 
-                 options = list(
-                   scrollX = TRUE,
-                   fixedColumns = list(leftColumns = 2),
-                   pageLength = 10
-                 ))
-      } else {
-        datatable(data.frame(Message = "No crosses found or error occurred"), 
-                 options = list(pageLength = 10))
-      }
-    })
-    
-    output$optimization_plot <- renderPlot({
-      if (!is.null(optimized_crosses$plot)) {
-        optimized_crosses$plot
-      } else {
-        plot(0, 0, type = "n", axes = FALSE, xlab = "", ylab = "")
-        text(0, 0, "No plot available", cex = 1.5)
-      }
-    })
-
-    output$download_optimized_plan <- downloadHandler(
-  filename = function() {
-    paste("optimized_crossing_plan_", Sys.Date(), ".xlsx", sep = "")
-  },
-  content = function(file) {
-    # Check if optimized crosses exist
-    if (!is.null(optimized_crosses$crosses) && nrow(optimized_crosses$crosses) > 0) {
-      writexl::write_xlsx(optimized_crosses$crosses, path = file)
-    } else {
-      # If no optimized crosses, create a dummy dataframe with a message
-      dummy_data <- data.frame(Message = "No optimized crosses available. Please run the optimization first.")
-      writexl::write_xlsx(dummy_data, path = file)
-    }
-  }
-)
-
   })
 }
 

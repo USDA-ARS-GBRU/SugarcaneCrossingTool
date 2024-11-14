@@ -179,90 +179,72 @@ createPedigreeGraph <- function(data, selected_clone_id = NULL) {
   }
 }
 
-optimize_crosses <- function(inventory_data, male_parents, female_parents, n_crosses, max_crosses_per_parent, min_crosses_per_parent, culling_k, prop_sel) {
-  # Filter inventory data for selected parents
-  selected_parents <- c(male_parents, female_parents)
-  filtered_inventory <- inventory_data[inventory_data$Clone %in% selected_parents, ]
+optimize_crosses <- function(inventory_data, male_parents, female_parents, 
+                           performance_data, A_matrix,
+                           n_crosses = 10, 
+                           max_crosses_per_parent = 3, 
+                           min_crosses_per_parent = 1, 
+                           weights = c(0.33, 0.33, 0.34),
+                           culling_k = 1) {
   
-  # Debug print
-  print("Selected parents:")
-  print(selected_parents)
+  # Scale the performance data
+  performance_data <- performance_data %>%
+    mutate(across(c(totalbiomass, ratooningability, averagebrix), scale)) %>%
+    mutate(performance_index = weights[1] * totalbiomass +
+                              weights[2] * ratooningability +
+                              weights[3] * averagebrix)
   
-  # Create dummy BLUP values for two traits
-  n_parents <- length(selected_parents)
-  dummy_blup1 <- rnorm(n_parents)
-  dummy_blup2 <- rnorm(n_parents)
-  dummy_blups <- data.frame(
-    Clone = selected_parents,
-    Trait1 = dummy_blup1,
-    Trait2 = dummy_blup2
-  )
+  # Standardize A matrix names
+  rownames(A_matrix) <- gsub("\\.", "-", rownames(A_matrix))
+  colnames(A_matrix) <- gsub("\\.", "-", colnames(A_matrix))
   
-  # Create a dummy relationship matrix
-  dummy_K <- matrix(runif(n_parents^2, 0, 1), nrow = n_parents, ncol = n_parents)
-  rownames(dummy_K) <- colnames(dummy_K) <- selected_parents
+  # Create crossing matrix
+  crossing_matrix <- expand.grid(
+    Female.Parent = female_parents,
+    Male.Parent = male_parents,
+    stringsAsFactors = FALSE
+  ) %>%
+    left_join(performance_data %>% select(id, performance_index), 
+              by = c("Female.Parent" = "id")) %>%
+    rename(performance_index.female = performance_index) %>%
+    left_join(performance_data %>% select(id, performance_index),
+              by = c("Male.Parent" = "id")) %>%
+    rename(performance_index.male = performance_index)
   
-  # Create custom crossing plan ensuring females and males are correctly assigned
-  cross_plan <- SimpleMating::planCross(TargetPop = female_parents, TargetPop2 = male_parents)
+  # Calculate coancestry and predicted performance
+  crossing_matrix$coancestry <- mapply(function(f, m) {
+    A_matrix[f, m]
+  }, crossing_matrix$Female.Parent, crossing_matrix$Male.Parent)
   
-  # Debug print
-  print("Cross plan:")
-  print(head(cross_plan))
-  print(paste("Number of crosses:", nrow(cross_plan)))
-  
-  # Predict mid-parent average
-  mpa <- tryCatch({
-    SimpleMating::getMPA(MatePlan = cross_plan,
-                        Criterion = dummy_blups,
-                        K = dummy_K,
-                        Weights = c(0.5, 0.5))
-  }, error = function(e) {
-    print(paste("Error in MPA calculation:", e$message))
-    return(NULL)
+  crossing_matrix$predicted_performance <- with(crossing_matrix, {
+    (performance_index.female + performance_index.male) / 2 * (1 - culling_k * coancestry)
   })
   
-  if (is.null(mpa)) {
-    return(list(crosses = data.frame(Message = "Error in MPA calculation"), plot = NULL))
-  }
+  # Sort and select top crosses
+  selected_crosses <- crossing_matrix %>%
+    arrange(desc(predicted_performance)) %>%
+    head(n_crosses)
   
-  # Select crosses
-  optimized_plan <- tryCatch({
-    plan <- SimpleMating::selectCrosses(data = mpa,
-                                      n.cross = n_crosses,
-                                      max.cross = max_crosses_per_parent,
-                                      min.cross = min_crosses_per_parent,
-                                      culling.pairwise.k = culling_k)
-    
-    if (is.null(plan) || length(plan) < 2 || is.null(plan[[2]])) {
-      return(NULL)
-    }
-    
-    # Rename columns and round Y and K values
-    plan[[2]] <- plan[[2]] %>%
-      rename(Female.Parent = Parent1, Male.Parent = Parent2) %>%
-      mutate(across(c(Y, K), ~round(., 3)))
-    
-    plan
-    
-  }, error = function(e) {
-    print(paste("Error in cross selection:", e$message))
-    return(NULL)
-  })
+  # Create visualization
+  plot <- ggplot(crossing_matrix, aes(x = coancestry, y = predicted_performance)) +
+    geom_point(alpha = 0.5) +
+    geom_point(data = selected_crosses, color = "red", size = 3) +
+    theme_bw() +
+    labs(x = "Coefficient of Coancestry",
+         y = "Predicted Performance",
+         title = "Cross Performance vs Coancestry",
+         caption = "Red points indicate selected crosses.\nCoancestry > 1 indicates highly inbred parents.") +
+    theme(plot.caption = element_text(hjust = 0, size = 10))
   
-  if (is.null(optimized_plan)) {
-    return(list(
-      crosses = data.frame(
-        Message = "No valid crosses found. Try adjusting the culling parameter or increasing the number of parents."
-      ), 
-      plot = NULL
-    ))
-  }
-  
-  # Prepare output
-  crosses <- optimized_plan[[2]]
-  plot <- optimized_plan[[3]]
-  
-  return(list(crosses = crosses, plot = plot))
+  return(list(
+    crosses = selected_crosses,
+    plot = plot,
+    summary = list(
+      mean_performance = mean(selected_crosses$predicted_performance),
+      mean_coancestry = mean(selected_crosses$coancestry),
+      n_crosses = nrow(selected_crosses)
+    )
+  ))
 }
 
 fetch_pedigree_data <- function(clone) {
