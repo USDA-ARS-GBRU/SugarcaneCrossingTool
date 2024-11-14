@@ -58,20 +58,17 @@ InitCrossTable <- function(cross_list, Cross.Name="Cross.Unique.ID", Female.Pare
   cross_list2<-cross_list2 %>% left_join(seeds, by="Cross.Unique.ID")
   
   #aggregate
-  cross_table <- as.data.frame(aggregate(Cross.Unique.ID ~ Female.Parent + Male.Parent, FUN = c, data = cross_list2)) %>% 
+  cross_table<-as.data.frame(aggregate(Cross.Unique.ID ~ Female.Parent + Male.Parent, FUN = c, data = cross_list2)) %>% 
     left_join(as.data.frame(aggregate(Number.of.Progenies ~ Female.Parent + Male.Parent, FUN = sum, data = cross_list2))) %>% 
-    left_join(as.data.frame(aggregate(data.amount ~ Female.Parent + Male.Parent, FUN = sum, data = cross_list2)))
+    left_join(  as.data.frame(aggregate(data.amount ~ Female.Parent + Male.Parent, FUN = sum, data = cross_list2)))
   
   cross_table$total.crosses<-apply(cross_table, 1, function(x) {length(x$Cross.Unique.ID)})
   
   #cleanup
-  colnames(cross_table) <- c("Female.Parent", "Male.Parent", "Cross.Names", "Total.Number.of.Progenies", "Seed.Quantity.grams")
-  cross_table$Number.of.Crosses <- sapply(cross_table$Cross.Names, length)
+  colnames(cross_table)<-c("Female.Parent", "Male.Parent", "Total.Number.of.Progenies", "Seed.Quantity.grams", "Number.of.Crosses", "Cross.Names")    
   
-  # Reorder columns
-  cross_table <- cross_table[, c("Female.Parent", "Male.Parent", "Total.Number.of.Progenies", 
-                                  "Seed.Quantity.grams", "Number.of.Crosses", "Cross.Names")]
-  
+  cross_table<-cross_table[,c(1:2, 3:6)]
+    
   return(cross_table)
 
   } else {
@@ -182,109 +179,101 @@ createPedigreeGraph <- function(data, selected_clone_id = NULL) {
   }
 }
 
-optimize_crosses <- function(inventory_data, male_parents, female_parents, 
-                           performance_data, A_matrix, previous_crosses,
-                           n_crosses = 10, 
-                           max_crosses_per_parent = 3, 
-                           min_crosses_per_parent = 1, 
-                           weights = c(0.33, 0.33, 0.34),
-                           culling_k = 1) {
-  
-  # Validate weights sum to approximately 1
-  if(abs(sum(weights) - 1) > 0.01) {
-    stop("Trait weights must sum to 1")
+optimize_crosses <- function(inventory_data, male_parents, female_parents, n_crosses, max_crosses_per_parent, culling_k, prop_sel, blup, amat, weights) {
+  # Check if weights sum to 1 (within 1% tolerance)
+  if (abs(sum(weights) - 1) > 0.01) {
+    return(list(
+      crosses = data.frame(Message = "Error: Trait weights must sum to 1"),
+      plot = NULL
+    ))
   }
   
-  # Scale the performance data
-  performance_data <- performance_data %>%
-    mutate(across(c(totalbiomass, ratooningability, averagebrix), scale)) %>%
-    mutate(performance_index = weights[1] * totalbiomass +
-                              weights[2] * ratooningability +
-                              weights[3] * averagebrix)
+  # Filter inventory data for selected parents
+  selected_parents <- c(male_parents, female_parents)
+  filtered_inventory <- inventory_data[inventory_data$Clone %in% selected_parents, ]
   
-  # Standardize A matrix names
-  rownames(A_matrix) <- gsub("\\.", "-", rownames(A_matrix))
-  colnames(A_matrix) <- gsub("\\.", "-", colnames(A_matrix))
+  # Debug print
+  print("Selected parents:")
+  print(selected_parents)
   
-  # Create crossing matrix
-  crossing_matrix <- expand.grid(
-    Female.Parent = female_parents,
-    Male.Parent = male_parents,
-    stringsAsFactors = FALSE
-  ) %>%
-    left_join(performance_data %>% select(id, performance_index), 
-              by = c("Female.Parent" = "id")) %>%
-    rename(performance_index.female = performance_index) %>%
-    left_join(performance_data %>% select(id, performance_index),
-              by = c("Male.Parent" = "id")) %>%
-    rename(performance_index.male = performance_index)
+  blup<-blup[blup$Clone%in%selected_parents,]
+  amat<-as.matrix(amat[selected_parents, selected_parents])
   
-  # Calculate coancestry and predicted performance
-  crossing_matrix$coancestry <- mapply(function(f, m) {
-    A_matrix[f, m]
-  }, crossing_matrix$Female.Parent, crossing_matrix$Male.Parent)
+  # # Create dummy BLUP values for two traits
+  # n_parents <- length(selected_parents)
+  # dummy_blup1 <- rnorm(n_parents)
+  # dummy_blup2 <- rnorm(n_parents)
+  # dummy_blups <- data.frame(
+  #   Clone = selected_parents,
+  #   Trait1 = dummy_blup1,
+  #   Trait2 = dummy_blup2
+  # )
+  # 
+  # # Create a dummy relationship matrix
+  # dummy_K <- matrix(runif(n_parents^2, 0, 1), nrow = n_parents, ncol = n_parents)
+  # rownames(dummy_K) <- colnames(dummy_K) <- selected_parents
+  # 
+  # Create custom crossing plan ensuring females and males are correctly assigned
+  cross_plan <- SimpleMating::planCross(TargetPop = female_parents, TargetPop2 = male_parents)
   
-  crossing_matrix$predicted_performance <- with(crossing_matrix, {
-    (performance_index.female + performance_index.male) / 2 * (1 - culling_k * coancestry)
+  # Debug print
+  print("Cross plan:")
+  print(head(cross_plan))
+  print(paste("Number of crosses:", nrow(cross_plan)))
+  
+  # Predict mid-parent average
+  mpa <- tryCatch({
+    SimpleMating::getMPA(MatePlan = cross_plan,
+                        Criterion = blup[,1:4],
+                        K = amat,
+                        Weights = weights)
+  }, error = function(e) {
+    print(paste("Error in MPA calculation:", e$message))
+    return(NULL)
   })
   
-  # Add rank information
-  crossing_matrix <- crossing_matrix %>%
-    arrange(desc(predicted_performance)) %>%
-    mutate(rank = row_number())
-  
-  # Join with previous crosses information if available
-  if (!is.null(previous_crosses)) {
-    crossing_matrix <- crossing_matrix %>%
-      left_join(
-        previous_crosses %>% 
-          select(Female.Parent, Male.Parent, Seed.Quantity.grams, Number.of.Crosses),
-        by = c("Female.Parent", "Male.Parent")
-      )
+  if (is.null(mpa)) {
+    return(list(crosses = data.frame(Message = "Error in MPA calculation"), plot = NULL))
   }
   
-  # Select top crosses
-  selected_crosses <- crossing_matrix %>%
-    head(n_crosses)
+  # Select crosses
+  optimized_plan <- tryCatch({
+    plan <- SimpleMating::selectCrosses(data = mpa,
+                                      n.cross = n_crosses,
+                                      max.cross = max_crosses_per_parent,
+                                      min.cross = 1,
+                                      culling.pairwise.k = culling_k)
+    
+    if (is.null(plan) || length(plan) < 2 || is.null(plan[[2]])) {
+      return(NULL)
+    }
+    
+    # Rename columns and round Y and K values
+    plan[[2]] <- plan[[2]] %>%
+      rename(Female.Parent = Parent1, Male.Parent = Parent2) %>%
+      mutate(across(c(Y, K), ~round(., 3)))
+    
+    plan
+    
+  }, error = function(e) {
+    print(paste("Error in cross selection:", e$message))
+    return(NULL)
+  })
   
-  # Create visualization with hover information and culling threshold line
-  plot <- ggplot(crossing_matrix, 
-         aes(x = coancestry, 
-             y = predicted_performance,
-             text = sprintf(
-               "Rank: %d\nFemale Parent: %s\nMale Parent: %s%s%s",
-               rank,
-               Female.Parent,
-               Male.Parent,
-               ifelse(!is.na(Seed.Quantity.grams), 
-                     sprintf("\nSeed Quantity: %.2f g", Seed.Quantity.grams), 
-                     ""),
-               ifelse(!is.na(Number.of.Crosses), 
-                     sprintf("\nPrevious Crosses: %d", Number.of.Crosses), 
-                     "")
-             ))) +
-    geom_vline(xintercept = culling_k, linetype = "dashed", color = "gray50") +
-    geom_point(alpha = 0.5) +
-    geom_point(data = selected_crosses, color = "red", size = 3) +
-    theme_bw() +
-    labs(x = "Coefficient of Coancestry",
-         y = "Predicted Performance",
-         title = "Cross Performance vs Coancestry",
-         caption = sprintf("Dashed line shows culling threshold (k = %.2f)", culling_k)) +
-    theme(plot.caption = element_text(hjust = 0, size = 10))
+  if (is.null(optimized_plan)) {
+    return(list(
+      crosses = data.frame(
+        Message = "No valid crosses found. Try adjusting the culling parameter or increasing the number of parents."
+      ), 
+      plot = NULL
+    ))
+  }
   
-  # Convert to plotly for interactive hover
-  plot <- ggplotly(plot, tooltip = "text")
+  # Prepare output
+  crosses <- optimized_plan[[2]]
+  plot <- optimized_plan[[3]]
   
-  return(list(
-    crosses = selected_crosses,
-    plot = plot,
-    summary = list(
-      mean_performance = mean(selected_crosses$predicted_performance),
-      mean_coancestry = mean(selected_crosses$coancestry),
-      n_crosses = nrow(selected_crosses)
-    )
-  ))
+  return(list(crosses = crosses, plot = plot))
 }
 
 fetch_pedigree_data <- function(clone) {

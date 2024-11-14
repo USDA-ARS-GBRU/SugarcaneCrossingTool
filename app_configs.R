@@ -2,6 +2,11 @@
 pedigree_download<-read.csv("data/demo_fullpedigree.csv") #needs to be updated each year
 historical_crosses<-read.csv("data/demo_historicalcrosses.csv") #needs to be updated each year
 
+blup_data<-read.csv("data/StageWiseParentBLUPS.csv")
+colnames(blup_data)[1]<-"Clone"
+
+parent_amat<-read.csv("data/ParentAmatrix.csv", row.names=1, check.names=F)
+
 ## INIT DB CONNECTION ----------------------
 
 location_iid_map <- list(
@@ -46,6 +51,3 @@ brap2 <- brapi::as.ba_db(
   bms = FALSE,
   version = "v2"
 )
-
-
-
