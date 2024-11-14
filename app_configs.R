@@ -2,6 +2,9 @@
 pedigree_download<-read.csv("data/demo_fullpedigree.csv") #needs to be updated each year
 historical_crosses<-read.csv("data/demo_historicalcrosses.csv") #needs to be updated each year
 
+URL="sugarcanebase.breedinginsight.net"
+USERNAME="appuser"
+PASS="appuser123"
 ## INIT DB CONNECTION ----------------------
 
 location_iid_map <- list(
@@ -16,13 +19,13 @@ crosses_iid_map<-list(
 brap <- brapi::as.ba_db(
   secure = FALSE,
   protocol = "https://",
-  db =Sys.getenv("URL"),
+  db =URL,
   port = 80,
   apipath = NULL,
   multicrop = FALSE,
   crop = "",
-  user = Sys.getenv("USERNAME"),
-  password = Sys.getenv("PASS"),
+  user = USERNAME,
+  password = PASS,
   token = "",
   granttype = "password",
   clientid = "rbrapi",
@@ -33,13 +36,13 @@ brap <- brapi::as.ba_db(
 brap2 <- brapi::as.ba_db(
   secure = FALSE,
   protocol = "https://",
-  db =  Sys.getenv("URL"),
+  db =  URL,
   port = 80,
   apipath = NULL,
   multicrop = FALSE,
   crop = "",
-  user = Sys.getenv("USERNAME"),
-  password = Sys.getenv("PASS"),
+  user = USERNAME,
+  password = PASS,
   token = "",
   granttype = "password",
   clientid = "rbrapi",
@@ -47,5 +50,8 @@ brap2 <- brapi::as.ba_db(
   version = "v2"
 )
 
+blups<-read.csv("data/StageWiseParentBLUPS.csv")
+colnames(blups)[1]<-"Clone"
 
+amat<-read.csv("data/ParentAmatrix.csv", row.names = 1, check.names = F)
 

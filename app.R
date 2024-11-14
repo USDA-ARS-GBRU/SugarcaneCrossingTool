@@ -699,7 +699,7 @@ server <- function(input, output, session) {
       return()
     }
     
-    # Run optimization
+    # Run optimization <-----
     optimized_crosses <- tryCatch({
       optimize_crosses(inventory_data, 
                        male_parents,
@@ -708,7 +708,8 @@ server <- function(input, output, session) {
                        max_crosses_per_parent = input$max_crosses_per_parent,
                        min_crosses_per_parent = input$min_crosses_per_parent,
                        culling_k = input$culling_k,
-                       prop_sel = input$prop_sel)
+                       blups=blups, 
+                       amat=amat)
     }, error = function(e) {
       showNotification(paste("Error in optimization:", e$message), type = "error")
       return(list(crosses = data.frame(), plot = NULL))
