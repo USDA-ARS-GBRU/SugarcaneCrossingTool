@@ -298,49 +298,80 @@ ui <- dashboardPage(
       tabItem(
         tabName = "flowering",
         
-        fluidRow(
-       
-     
-          box(
-            title = "Step 5: Sorting",
-            p("Drag and drop the available flowering clones into their appropriate category.", strong("Only"), "sorted clones will be displayed in subsequent tabs and/or used in cross prediction so this step must be done first."),
-            width = 12,
+        tabsetPanel(
+          # Existing tab for sorting
+          tabPanel(
+            "Parent Sorting",
+            fluidRow(
+              box(
+                title = "Step 5: Sorting",
+                p("Drag and drop the available flowering clones into their appropriate category.", strong("Only"), "sorted clones will be displayed in subsequent tabs and/or used in cross prediction so this step must be done first."),
+                width = 12,
+                fluidRow(
+                  column(
+                    width = 4,
+                    h4("Available Clones"),
+                    uiOutput("available_clones")
+                  ),
+                  column(
+                    width = 4,
+                    h4("Female Parents"),
+                    uiOutput("female_parents")
+                  ),
+                  column(
+                    width = 4,
+                    h4("Male Parents"),
+                    uiOutput("male_parents")
+                  )
+                )
+              )
+            ),
+            box(
+              title="This table shows you the raw data for the sorting you did above.",
+              textOutput("dataSourceText"),
+              width=12,
+              fluidRow(
+                column(
+                  width=4, 
+                  DTOutput("inventoryTable"),
+                )
+              )
+            )
+          ),
+          
+          # New tab for possible cross selections
+          tabPanel(
+            "Possible Cross Selections",
             fluidRow(
               column(
-                width = 4,
-                h4("Available Clones"),
-                uiOutput("available_clones")
+                width = 6,
+                box(
+                  title = "Female Parents",
+                  width = NULL,
+                  uiOutput("female_selection_ui")
+                )
               ),
               column(
-                width = 4,
-                h4("Female Parents"),
-                uiOutput("female_parents")
-              ),
-              column(
-                width = 4,
-                h4("Male Parents"),
-                uiOutput("male_parents")
+                width = 6,
+                box(
+                  title = "Male Parents",
+                  width = NULL,
+                  uiOutput("male_selection_ui")
+                )
+              )
+            ),
+            fluidRow(
+              box(
+                title = "Selected Cross Combinations",
+                width = 12,
+                uiOutput("remove_selected_crosses"),
+                DTOutput("cross_combinations_table"),
+                downloadButton("download_crosses", "Download Selected Crosses")
               )
             )
           )
-        ),
-     
-
-        box(title="This table shows you the raw data for the sorting you did above.",
-             textOutput("dataSourceText"),
-            width=12,
-            fluidRow(
-              column(
-                width=4, 
-                DTOutput("inventoryTable"),
-              )
-            )),
-        
-       
-
-
-        
-         ),
+        )
+      ),
 
       ### Pedigree tab content ----
 
@@ -853,6 +884,156 @@ server <- function(input, output, session) {
       return(paste("Weights sum to", round(total_weight, 2)))
     }
   })
+
+  # Reactive values for tracking available crosses
+  cross_counts <- reactiveVal(list())
+  selected_crosses <- reactiveVal(data.frame())
+  
+  # Generate UI for female parent selection
+  output$female_selection_ui <- renderUI({
+    female_parents <- clone_assignments()$female
+    if (length(female_parents) == 0) {
+      return(HTML("<p>Please assign female parents in the Parent Sorting tab first.</p>"))
+    }
+    
+    # Get inventory data with flowering counts
+    inventory_data <- inventory_init()
+    
+    # Create choices list with names and flowering counts
+    choices <- sapply(female_parents, function(p) {
+      count <- inventory_data$FloweringCount[inventory_data$Clone == p]
+      remaining <- count - sum(selected_crosses()$Female == p, na.rm = TRUE)
+      remaining <- max(0, remaining)
+      paste0(p, " (", remaining, " available crosses)")
+    })
+    
+    checkboxGroupInput(
+      "selected_females",
+      "Select Female Parents:",
+      choices = setNames(female_parents, choices)
+    )
+  })
+  
+  # Generate UI for male parent selection
+  output$male_selection_ui <- renderUI({
+    male_parents <- clone_assignments()$male
+    if (length(male_parents) == 0) {
+      return(HTML("<p>Please assign male parents in the Parent Sorting tab first.</p>"))
+    }
+    
+    # Get inventory data with flowering counts
+    inventory_data <- inventory_init()
+    
+    # Create choices list with names and flowering counts
+    choices <- sapply(male_parents, function(p) {
+      count <- inventory_data$FloweringCount[inventory_data$Clone == p]
+      remaining <- count - sum(selected_crosses()$Male == p, na.rm = TRUE)
+      remaining <- max(0, remaining)
+      paste0(p, " (", remaining, " available crosses)")
+    })
+    
+    checkboxGroupInput(
+      "selected_males",
+      "Select Male Parents:",
+      choices = setNames(male_parents, choices)
+    )
+  })
+  
+  # Update cross combinations when selections change
+  observeEvent(c(input$selected_females, input$selected_males), {
+    selected_females <- input$selected_females
+    selected_males <- input$selected_males
+    
+    if (!is.null(selected_females) && !is.null(selected_males) && 
+        length(selected_females) > 0 && length(selected_males) > 0) {
+      
+      inventory_data <- inventory_init()
+      current_crosses <- selected_crosses()
+      
+      # Generate new combinations
+      new_combinations <- expand.grid(
+        Female = selected_females,
+        Male = selected_males,
+        stringsAsFactors = FALSE
+      )
+      
+      # Filter out combinations that would exceed flowering counts
+      valid_combinations <- new_combinations[0,]
+      
+      for (i in 1:nrow(new_combinations)) {
+        female <- new_combinations$Female[i]
+        male <- new_combinations$Male[i]
+        
+        female_count <- inventory_data$FloweringCount[inventory_data$Clone == female]
+        male_count <- inventory_data$FloweringCount[inventory_data$Clone == male]
+        
+        female_used <- sum(current_crosses$Female == female, na.rm = TRUE)
+        male_used <- sum(current_crosses$Male == male, na.rm = TRUE)
+        
+        if (female_used < female_count && male_used < male_count) {
+          valid_combinations <- rbind(valid_combinations, new_combinations[i,])
+        }
+      }
+      
+      if (nrow(valid_combinations) > 0) {
+        # Add Status and Available_Crosses columns
+        valid_combinations$Status <- "Selected"
+        valid_combinations$Female_Remaining <- sapply(valid_combinations$Female, function(p) {
+          count <- inventory_data$FloweringCount[inventory_data$Clone == p]
+          remaining <- count - sum(current_crosses$Female == p, na.rm = TRUE)
+          max(0, remaining)
+        })
+        valid_combinations$Male_Remaining <- sapply(valid_combinations$Male, function(p) {
+          count <- inventory_data$FloweringCount[inventory_data$Clone == p]
+          remaining <- count - sum(current_crosses$Male == p, na.rm = TRUE)
+          max(0, remaining)
+        })
+        
+        # Combine with existing crosses
+        if (!is.null(current_crosses) && nrow(current_crosses) > 0) {
+          valid_combinations <- rbind(current_crosses, valid_combinations)
+        }
+        
+        selected_crosses(valid_combinations)
+        
+        # Update the table
+        output$cross_combinations_table <- renderDT({
+          datatable(valid_combinations,
+                   options = list(pageLength = 10),
+                   selection = 'multiple')
+        })
+      }
+    }
+  })
+  
+  # Add remove selected crosses button
+  output$remove_selected_crosses <- renderUI({
+    actionButton("remove_crosses", "Remove Selected Crosses")
+  })
+  
+  # Handle removing selected crosses
+  observeEvent(input$remove_crosses, {
+    selected_rows <- input$cross_combinations_table_rows_selected
+    if (!is.null(selected_rows)) {
+      current_crosses <- selected_crosses()
+      if (nrow(current_crosses) > 0) {
+        selected_crosses(current_crosses[-selected_rows,])
+      }
+    }
+  })
+  
+  # Download handler for selected crosses
+  output$download_crosses <- downloadHandler(
+    filename = function() {
+      paste0("selected_crosses_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".csv")
+    },
+    content = function(file) {
+      crosses <- selected_crosses()
+      if (!is.null(crosses) && nrow(crosses) > 0) {
+        write.csv(crosses, file, row.names = FALSE)
+      }
+    }
+  )
 }
 
 # Run the Shiny app
