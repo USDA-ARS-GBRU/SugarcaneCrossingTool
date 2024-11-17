@@ -25,6 +25,7 @@ library(bslib)
 library(SimpleMating)
 library(sortable)
 library(shinyjs)
+library(plyr)
 
 
 # Include necessary JavaScript libraries
@@ -95,13 +96,12 @@ ui <- dashboardPage(
     
     dateInput(
       "date",
-      "Step 3: Choose A Date",
-      value = "2023-10-10"
+      "Step 3: Choose A Date"
     ),
     #actionButton("brapipull", "Get Flower Inventory Data"),
     textOutput("dateWarning"), 
     
-    p("for testing, select:", strong("October 10, 2023")),
+
     
     actionButton(
       "brapipull",
@@ -297,44 +297,72 @@ ui <- dashboardPage(
       tabItem(
         tabName = "flowering",
         
+        # fluidRow(
+        # 
+        # 
+        #   box(
+        #     title = "Step 5: Sorting",
+        #     p("Drag and drop the available flowering clones into their appropriate category.", strong("Only"), "sorted clones will be displayed in subsequent tabs and/or used in cross prediction so this step must be done first."),
+        #     width = 12,
+        #     fluidRow(
+        #       column(
+        #         width = 4,
+        #         h4("Available Clones"),
+        #         uiOutput("available_clones")
+        #       ),
+        #       column(
+        #         width = 4,
+        #         h4("Female Parents"),
+        #         uiOutput("female_parents")
+        #       ),
+        #       column(
+        #         width = 4,
+        #         h4("Male Parents"),
+        #         uiOutput("male_parents")
+        #       )
+        #     )
+        #   )
+        # ),
+
+        
         fluidRow(
-       
-     
+
           box(
-            title = "Step 5: Sorting",
-            p("Drag and drop the available flowering clones into their appropriate category.", strong("Only"), "sorted clones will be displayed in subsequent tabs and/or used in cross prediction so this step must be done first."),
+            title = "Inventory",
+            p("These tables show the number and location of male and female clones flowering today"),
             width = 12,
             fluidRow(
               column(
-                width = 4,
-                h4("Available Clones"),
-                uiOutput("available_clones")
+                width = 6,
+                h4("Male Clones"),
+                DTOutput("inventoryTableMale")
               ),
               column(
-                width = 4,
-                h4("Female Parents"),
-                uiOutput("female_parents")
-              ),
-              column(
-                width = 4,
-                h4("Male Parents"),
-                uiOutput("male_parents")
+                width = 6,
+                h4("Female Clones"),
+                DTOutput("inventoryTableFemale")
+              
               )
             )
           )
-        ),
-     
-
-        box(title="This table shows you the raw data for the sorting you did above.",
-             textOutput("dataSourceText"),
-            width=12,
-            fluidRow(
-              column(
-                width=4, 
-                DTOutput("inventoryTable"),
-              )
-            )),
+        )
         
+
+        # fluidRow(
+        # box(title="These tables shows you Male Parents flowering today",
+        #      textOutput("dataSourceText"),
+        #     width=12,
+        #     fluidRow(
+        #       column(
+        #         width=4, 
+        #         DTOutput("inventoryTableMale"),
+        #       ),
+        #       column(
+        #         width=4, 
+        #         DTOutput("inventoryTableFemale"),
+        #       )
+        #     ))),
+        # 
        
 
 
@@ -503,25 +531,46 @@ ui <- dashboardPage(
   )
 )
 
-
-# Define the inventory_init function as a global variable
 inventory_init <<- eventReactive(input$brapipull, withProgress(message = "Pulling Inventory Data", {
   tryCatch({
+    
     inven <- data.frame(brapi::ba_studies_table(con = brap, studyDbId = reactive_iid(), rclass="data.frame")) %>%
-      filter(observationLevel == "plant") %>% # select just plant rows
-      set_names(~(.)%>% str_replace_all("SUGARCANE.*","") %>% str_replace_all("\\.","")) %>%  # take CO term out of colnames
-      filter(FloweringTime== reactive_date()) %>% 
-      select(germplasmName, germplasmDbId, SexMFWM) %>% 
-      group_by(germplasmName, germplasmDbId, SexMFWM) %>% 
-      summarise(count = n()) %>%
-      rename(Clone = germplasmName, FloweringCount = count, Sex = SexMFWM)
+      filter(observationLevel == "plot") %>% # select just plant rows
+      set_names(~(.)%>% str_replace_all("SUGARCANE.*","") %>% str_replace_all("\\.","")) %>% # take CO term out of colnames
+      mutate_at('blockNumber', as.factor)
+    
+    inven$blockNumber<-revalue(inven$blockNumber, c("1"="West", "2"="East", "3"="Railcarts", "4"="Back"))
+    
+    inven_male<-filter(inven, grepl(reactive_date(),TasselCountMale)) %>% 
+      select(germplasmName, blockNumber, notes, TasselCountMale) %>% 
+      separate(TasselCountMale, into=c("Count",NA), sep=",") %>%
+      group_by(germplasmName)
+    
+    male<-merge(aggregate(as.numeric(Count)~germplasmName,inven_male, sum ),
+                aggregate(blockNumber~germplasmName,inven_male, function(x) paste(unique(x), collapse=":")))
+    
+    inven_female<-filter(inven, grepl(reactive_date(),TasselCountFemale)) %>% 
+      select(germplasmName, blockNumber, notes, TasselCountFemale) %>% 
+      separate(TasselCountFemale, into=c("Count",NA), sep=",") %>%
+      group_by(germplasmName)
+    
+    female<-merge(aggregate(as.numeric(Count)~germplasmName,inven_female, sum ),
+                  aggregate(blockNumber~germplasmName,inven_female, function(x) paste0(unique(x), collapse=":")))
+    
+    colnames(male)<-colnames(female)<-c("Clone", "FlowerCount", "Location")
+    
+    inven2<-list(male, female)
+    names(inven2)<-c("male", "female")
+    
     dataSource("Data pulled from BrAPI")
-    inven
+    inven2
   }, error = function(e) {
     dataSource("Saved data is being rendered")
-    data.frame(Clone = character(), FloweringCount = numeric(), Sex = character()) # Return an empty data frame with the expected columns
+    data.frame(Clone = character(), FloweringCount = numeric(), Location = character()) # Return an empty data frame with the expected columns
   })
 }))
+
+
 
 # SERVER ---------------------------------------
 

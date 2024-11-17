@@ -10,12 +10,12 @@ parent_amat<-read.csv("data/ParentAmatrix.csv", row.names=1, check.names=F)
 ## INIT DB CONNECTION ----------------------
 
 location_iid_map <- list(
-  "Florida" = "3654",  #needs to be updated each year
+  "Florida" = "3687",  #needs to be updated each year
   "Louisiana" = "3678"  #needs to be updated each year
 )
 
 crosses_iid_map<-list(
-  "DemoBreeder"="219"  #needs to be updated each year
+  "Aliya"="219"  #needs to be updated each year
 )
 
 brap <- brapi::as.ba_db(
