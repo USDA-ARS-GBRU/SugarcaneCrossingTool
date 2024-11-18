@@ -747,11 +747,12 @@ server <- function(input, output, session) {
   # Cross Optimization
   observeEvent(input$run_optimization, {
     # Get current inventory data
-    inventory_data <- inventory_init()
+    #inventory_data <- inventory_init()
+    inventory_data <- as.data.frame(rbind(inventory_init()$male, inventory_init()$female))
     
     # Get selected parents
-    male_parents <- clone_assignments()$male
-    female_parents <- clone_assignments()$female
+    male_parents <- as.data.frame(inventory_init()$male)$Clone
+    female_parents <- as.data.frame(inventory_init()$female)$Clone
     
     # Check if parents are selected
     if (length(male_parents) == 0 || length(female_parents) == 0) {
@@ -800,6 +801,75 @@ server <- function(input, output, session) {
       }
     })
     
+     output$optimization_plot <- renderPlotly({
+      if (!is.null(optimized_crosses$plot)) {
+        # Extract plot data and ensure it has all required columns
+        plot_data <- optimized_crosses$plot$data
+        
+        # Add rank column and selected status
+        plot_data$Rank <- 1:nrow(plot_data)
+        plot_data$Selected <- plot_data$Rank <= input$n_crosses
+        
+        # Create hover text based on available columns
+        hover_text <- paste(
+          "Rank:", plot_data$Rank,
+          "\nParent1:", plot_data$Parent1,
+          "\nParent2:", plot_data$Parent2,
+          "\nSelection Index:", round(plot_data$Y, 3),
+          "\nKinship:", round(plot_data$K, 3)
+        )
+        
+        # Add additional information if available
+        if ("Seed.Quantity" %in% names(plot_data)) {
+          hover_text <- paste(hover_text, 
+                            "\nSeed Quantity:", plot_data$Seed.Quantity)
+        }
+        if ("Number.of.Crosses" %in% names(plot_data)) {
+          hover_text <- paste(hover_text, 
+                            "\nPrevious Crosses:", plot_data$Number.of.Crosses)
+        }
+        
+        # Create new ggplot with hover text and vertical line
+        p <- ggplot(plot_data, aes(x = K, y = Y)) +
+          # Color points based on selection status
+          geom_point(aes(color = Selected), size = 3, alpha = 0.7) +
+          scale_color_manual(values = c("FALSE" = "gray70", "TRUE" = "#1f77b4")) +
+          geom_vline(xintercept = input$culling_k, linetype = "dashed", 
+                    color = "red", size = 1) +
+          theme_minimal() +
+          theme(
+            panel.grid.major = element_line(color = "gray90"),
+            panel.grid.minor = element_line(color = "gray95"),
+            axis.text = element_text(color = "gray30"),
+            axis.title = element_text(color = "gray30", size = 12),
+            plot.background = element_rect(fill = "white", color = NA),
+            panel.background = element_rect(fill = "white", color = NA),
+            legend.position = "top"
+          ) +
+          labs(
+            x = "Kinship Coefficient",
+            y = "Selection Index",
+            title = paste("Cross Optimization Plot (Top", input$n_crosses, "Crosses Highlighted)"),
+            color = "Selected Crosses"
+          ) +
+          aes(text = hover_text)
+        
+        ggplotly(p, tooltip = "text") %>%
+          layout(
+            hoverlabel = list(bgcolor = "white"),
+            plot_bgcolor = "white",
+            paper_bgcolor = "white"
+          )
+      } else {
+        plot_ly() %>%
+          add_annotations(
+            text = "No plot available",
+            x = 0.5,
+            y = 0.5,
+            showarrow = FALSE
+          )
+      }
+    })
     output$optimization_plot <- renderPlot({
       if (!is.null(optimized_crosses$plot)) {
         optimized_crosses$plot
