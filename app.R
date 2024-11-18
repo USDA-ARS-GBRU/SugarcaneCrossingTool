@@ -682,64 +682,67 @@ server <- function(input, output, session) {
     
   })
     
+
  # Reactive value to store the current state of clone assignments
-  clone_assignments <- reactiveVal(list(available = character(), male = character(), female = character()))
+  #clone_assignments <- reactiveVal(list(available = character(), male = character(), female = character()))
   
   # Initialize available clones
-  observe({
-    inventory_data <- inventory_init()
-    clones <- unique(inventory_data$Clone)
-    clone_assignments(list(available = clones, male = character(), female = character()))
-  })
+  # observe({
+  #   inventory_data <- inventory_init()
+  #   clones <- unique(inventory_data$Clone)
+  #   clone_assignments(list(available = clones, male = character(), female = character()))
+  # })
+
+
   
   # Render sortable lists
-  output$available_clones <- renderUI({
-    bucket_list(
-      header = "Available Clones",
-      group_name = "clone_buckets",
-      orientation = "vertical",
-      add_rank_list(
-        text = "Drag clones from here",
-        labels = clone_assignments()$available,
-        input_id = "available_list"
-      )
-    )
-  })
+  # output$available_clones <- renderUI({
+  #   bucket_list(
+  #     header = "Available Clones",
+  #     group_name = "clone_buckets",
+  #     orientation = "vertical",
+  #     add_rank_list(
+  #       text = "Drag clones from here",
+  #       labels = clone_assignments()$available,
+  #       input_id = "available_list"
+  #     )
+  #   )
+  # })
+  # 
+  # output$male_parents <- renderUI({
+  #   bucket_list(
+  #     header = "Male Parents",
+  #     group_name = "clone_buckets",
+  #     orientation = "vertical",
+  #     add_rank_list(
+  #       text = "Drag male parents here",
+  #       labels = clone_assignments()$male,
+  #       input_id = "male_list"
+  #     )
+  #   )
+  # })
   
-  output$male_parents <- renderUI({
-    bucket_list(
-      header = "Male Parents",
-      group_name = "clone_buckets",
-      orientation = "vertical",
-      add_rank_list(
-        text = "Drag male parents here",
-        labels = clone_assignments()$male,
-        input_id = "male_list"
-      )
-    )
-  })
-  
-  output$female_parents <- renderUI({
-    bucket_list(
-      header = "Female Parents",
-      group_name = "clone_buckets",
-      orientation = "vertical",
-      add_rank_list(
-        text = "Drag female parents here",
-        labels = clone_assignments()$female,
-        input_id = "female_list"
-      )
-    )
-  })
-  
+  # output$female_parents <- renderUI({
+  #   bucket_list(
+  #     header = "Female Parents",
+  #     group_name = "clone_buckets",
+  #     orientation = "vertical",
+  #     add_rank_list(
+  #       text = "Drag female parents here",
+  #       labels = clone_assignments()$female,
+  #       input_id = "female_list"
+  #     )
+  #   )
+  # })
+  # 
   # Update clone assignments when lists change
-  observe({
-    clone_assignments(list(
-      available = input$available_list,
-      male = input$male_list,
-      female = input$female_list
-    ))
-  })
+  # observe({
+  #   clone_assignments(list(
+  #     available = input$available_list,
+  #     male = input$male_list,
+  #     female = input$female_list
+  #   ))
+  # })
   
   # Cross Optimization
   observeEvent(input$run_optimization, {

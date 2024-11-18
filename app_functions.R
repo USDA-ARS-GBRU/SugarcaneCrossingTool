@@ -50,7 +50,7 @@ InitCrossTable <- function(cross_list, Cross.Name="Cross.Unique.ID", Female.Pare
                                                     collapse="")), 
                                rclass="data.frame")
  
-  seeds$data.amount<-as.numeric(as.character(seeds$data.amount))
+  seeds$data.amount<-round(as.numeric(as.character(seeds$data.amount)),0)
   
   seeds$Cross.Unique.ID<-gsub("SL-", "", seeds$data.seedLotName)
    
@@ -62,13 +62,16 @@ InitCrossTable <- function(cross_list, Cross.Name="Cross.Unique.ID", Female.Pare
     left_join(as.data.frame(aggregate(Number.of.Progenies ~ Female.Parent + Male.Parent, FUN = sum, data = cross_list2))) %>% 
     left_join(  as.data.frame(aggregate(data.amount ~ Female.Parent + Male.Parent, FUN = sum, data = cross_list2)))
   
-  cross_table$total.crosses<-apply(cross_table, 1, function(x) {length(x$Cross.Unique.ID)})
+  #cross_table$total.crosses<-apply(cross_table, 1, function(x) {length(x$Cross.Unique.ID)}) #this breaks if all entries have less than 2 crosses
   
   #cleanup
-  colnames(cross_table)<-c("Female.Parent", "Male.Parent", "Total.Number.of.Progenies", "Seed.Quantity.grams", "Number.of.Crosses", "Cross.Names")    
+  colnames(cross_table)<-c("Female.Parent", "Male.Parent", "Previous.Cross.Names", "Total.Number.of.Progenies", "Seed.Quantity.grams")    
   
-  cross_table<-cross_table[,c(1:2, 3:6)]
-    
+  #colnames(cross_table)<-c("Female.Parent", "Male.Parent", "Total.Number.of.Progenies", "Seed.Quantity.grams", "Number.of.Crosses", "Cross.Names")    
+  
+  #cross_table<-cross_table[,c(1:2, 3:6)]
+  #cross_table<-cross_table[,c(1:2, 3:5)]
+  
   return(cross_table)
 
   } else {
@@ -76,11 +79,13 @@ InitCrossTable <- function(cross_list, Cross.Name="Cross.Unique.ID", Female.Pare
     # #using current crosses from this year
     cross_table<-as.data.frame(aggregate(data.crossName~ data.parent1.germplasmName + data.parent2.germplasmName, FUN = c, data = cross_list))
     colnames(cross_table)<-c("Female.Parent", "Male.Parent", "Cross.Names")
-    cross_table$Number.of.Crosses<-apply(cross_table, 1, function(x) {length(x$Cross.Names)})
+    #cross_table$Number.of.Crosses<-apply(cross_table, 1, function(x) {length(x$Cross.Names)}) #this breaks if all entries have less than 2 crosses
     cross_table<-cross_table %>% mutate(Seed.Quantity.grams="none yet - cross made this year", Total.Number.of.Progenies="none yet- cross made this year")
 
-    cross_table<-cross_table[,c(1:2, 4:6, 3)]
-
+    #cross_table<-cross_table[,c(1:2, 4:6, 3)]
+    #cleanup
+    colnames(cross_table)<-c("Female.Parent", "Male.Parent", "Previous.Cross.Names", "Total.Number.of.Progenies", "Seed.Quantity.grams")    
+    
     return(cross_table)
   }
 }
