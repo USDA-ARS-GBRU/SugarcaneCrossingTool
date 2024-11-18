@@ -3,13 +3,18 @@
 ## Pedigree and Progeny ----
 pedigree_server <- function(input, output, session, reactive_iid, selectedClone, inventory_init, clone_assignments) {
   pedigree_init <- eventReactive(input$makepedigree, withProgress(message = "Pulling Progeny Data", {
-    germplasm <- as.data.frame(inventory_init())
-    germplasm <- germplasm[duplicated(germplasm$Clone) == FALSE, ]
+  
+    germplasm <- as.data.frame(rbind(inventory_init()$male, inventory_init()$female))
+    germplasm<-germplasm[duplicated(germplasm$Clone)==FALSE,]
     
     #Only show sorted clones
-    display<-c(input$male_list,input$female_list)
-    germplasm<-germplasm[which(germplasm$Clone%in%display),]
 
+
+    display<-c(inventory_init()$male$Clone,inventory_init()$female$Clone)
+    display_male<-c(inventory_init()$male$Clone)
+    display_female<-c(inventory_init()$female$Clone)
+    germplasm<-germplasm[which(germplasm$Clone%in%display),]
+    
     tmp <- stripClass(
       as.data.frame(
         ba_germplasm_details2(con = brap2, germplasmQuery = as.character(paste0("?studyDbId=", reactive_iid(), "&pageSize=1000")), rclass = "data.frame")
@@ -39,9 +44,11 @@ pedigree_server <- function(input, output, session, reactive_iid, selectedClone,
   }))
 
   deeppedigree_init <- eventReactive(input$selectedClone, {
-    germplasm <- as.data.frame(inventory_init())
-    germplasm <- germplasm[duplicated(germplasm$Clone) == FALSE, ]
-
+   
+    germplasm <- as.data.frame(rbind(inventory_init()$male, inventory_init()$female))
+    germplasm<-germplasm[duplicated(germplasm$Clone)==FALSE,]
+    
+    
     tmp <- jsonlite::fromJSON(ba_germplasm_pedigree(con = brap2, germplasmDbId = as.character(germplasm[which(germplasm$Clone == input$selectedClone), 2]), rclass = "json"))$result$data
 
     print("Structure of tmp:")
@@ -51,8 +58,10 @@ pedigree_server <- function(input, output, session, reactive_iid, selectedClone,
   })
 
   pedmatrix_init <- eventReactive(input$makepedigree, {
-    germplasm <<- as.data.frame(inventory_init())
-    germplasm <- germplasm[duplicated(germplasm$Clone) == FALSE, ]
+    
+    germplasm <- as.data.frame(rbind(inventory_init()$male, inventory_init()$female))
+    germplasm<-germplasm[duplicated(germplasm$Clone)==FALSE,]
+    
 
     mat <- PedMatrix(pedigree_download)
 
@@ -63,7 +72,7 @@ pedigree_server <- function(input, output, session, reactive_iid, selectedClone,
     #   axis <- c(germplasm$Clone, "LCP85-0384")
     # }
     
-    mat2 <- round(mat[input$male_list,input$female_list ], 2)
+    mat2 <- round(mat[inventory_init()$male$Clone,inventory_init()$female$Clone ], 2)
     mat2 <- as.data.frame(mat2)
     mat2$Clone <- rownames(mat2)
     mat2 <- mat2[, c(dim(mat2)[2], 1:dim(mat2)[2] - 1)]

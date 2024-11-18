@@ -12,22 +12,22 @@ flowering_server <- function(input, output, session, reactive_date, reactive_iid
       inven$blockNumber<-revalue(inven$blockNumber, c("1"="West", "2"="East", "3"="Railcarts", "4"="Back"))
       
       inven_male<-filter(inven, grepl(reactive_date(),TasselCountMale)) %>% 
-        select(germplasmName, blockNumber, notes, TasselCountMale) %>% 
+        select(germplasmName, blockNumber, notes, germplasmDbId, TasselCountMale) %>% 
         separate(TasselCountMale, into=c("Count",NA), sep=",") %>%
         group_by(germplasmName)
       
-      male<-merge(aggregate(as.numeric(Count)~germplasmName,inven_male, sum ),
-                  aggregate(blockNumber~germplasmName,inven_male, function(x) paste(unique(x), collapse=":")))
+      male<-merge(aggregate(as.numeric(Count)~germplasmName+germplasmDbId,inven_male, sum ),
+                  aggregate(blockNumber~germplasmName+germplasmDbId,inven_male, function(x) paste(unique(x), collapse=":")))
       
       inven_female<-filter(inven, grepl(reactive_date(),TasselCountFemale)) %>% 
-        select(germplasmName, blockNumber, notes, TasselCountFemale) %>% 
+        select(germplasmName, blockNumber, germplasmDbId, notes, TasselCountFemale) %>% 
         separate(TasselCountFemale, into=c("Count",NA), sep=",") %>%
         group_by(germplasmName)
       
-      female<-merge(aggregate(as.numeric(Count)~germplasmName,inven_female, sum ),
-                    aggregate(blockNumber~germplasmName,inven_female, function(x) paste(unique(x), collapse=":")))
+      female<-merge(aggregate(as.numeric(Count)~germplasmName+germplasmDbId,inven_female, sum ),
+                    aggregate(blockNumber~germplasmName+germplasmDbId,inven_female, function(x) paste(unique(x), collapse=":")))
       
-      colnames(male)<-colnames(female)<-c("Clone", "FlowerCount", "Location")
+      colnames(male)<-colnames(female)<-c("Clone", "germplasmDbId", "FlowerCount", "Location")
       
       inven2<-list(male, female)
       names(inven2)<-c("male", "female")
@@ -36,7 +36,7 @@ flowering_server <- function(input, output, session, reactive_date, reactive_iid
       inven2
     }, error = function(e) {
       dataSource("Saved data is being rendered")
-      data.frame(Clone = character(), FloweringCount = numeric(), Location = character()) # Return an empty data frame with the expected columns
+      data.frame(Clone = character(), germplasmDbId=character(), FloweringCount = numeric(), Location = character()) # Return an empty data frame with the expected columns
     })
   }))
   

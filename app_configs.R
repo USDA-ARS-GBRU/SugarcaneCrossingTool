@@ -1,5 +1,5 @@
 ## read in data (replace with your file path)
-pedigree_download<-read.csv("data/demo_fullpedigree.csv") #needs to be updated each year
+pedigree_download<-read.csv("data/2024ParentPedigree.csv") #needs to be updated each year
 historical_crosses<-read.csv("data/demo_historicalcrosses.csv") #needs to be updated each year
 
 blup_data<-read.csv("data/StageWiseParentBLUPS.csv")

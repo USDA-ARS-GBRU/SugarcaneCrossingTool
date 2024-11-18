@@ -1,24 +1,31 @@
 # create pedigree matrix
 PedMatrix <- function(pedigree) {
+ 
   ped <- pedigree[, 1:3]
-  ## clean data
-  # recode NAs and blank cells as 0
-  ped[is.na(ped)] <- "0"
-  # ped$Female_Parent<-gsub("^$","0", ped$Female_Parent) 
-  # ped$Male_Parent<-gsub("^$","0", ped$Male_Parent)
-  # recode unknown accessions as 0
-  ped$Accession <- gsub("unknown", "0", ped$Accession, fixed = T)
-  ped$Male_Parent <- gsub("unknown", "0", ped$Male_Parent, fixed = T)
-  ped$Female_Parent <- gsub("unknown", "0", ped$Female_Parent, fixed = T)
-  # remove duplicate entries
-  ped <- ped[!duplicated(ped$Accession), ]
-  # get rid of unknown accessions in first column
-  ped <- ped[-which(ped$Accession == 0), ]
-  # convert characters to factors
+  ped[grep("unknown|Unknown|^$", ped$Accession),"Accession"]<-0
+  ped[grep("unknown|Unknown|^$", ped$Male_Parent),"Male_Parent"]<-0
+  ped[grep("unknown|Unknown|^$", ped$Female_Parent),"Female_Parent"]<-0
+  
+  
+  ## subset data (take just first three columns)
+  ped<-ped[,1:3]
+  
+  
+  #remove duplicate entries
+  ped<-ped[!duplicated(ped$Accession),]
+  
+  #get rid of unknown accessions in first column
+  ped<-ped[-which(ped$Accession==0),]
+  
+  #convert characters to factors
   str(ped)
-  ped <- as.data.frame(map_if(ped, is.character, as.factor))
-  # calculate rel matrix
-  relmat <- as.matrix(Amatrix(ped, ploidy = 10))
+  
+  colnames(ped)<-c("Clone", "Female.Parent", "Male.Parent")
+  ped<-as.data.frame(map_if(ped, is.character, as.factor))
+  
+  relmat<-as.matrix(Amatrix(ped, ploidy=10))
+  
+
   return(relmat)
 }
 
