@@ -4,7 +4,7 @@
 
 ## LIBRARIES -----------
 # Load required libraries
-
+library(plyr)
 library(brapi)
 library(tidyverse)
 library(shiny)
@@ -25,7 +25,7 @@ library(bslib)
 library(SimpleMating)
 library(sortable)
 library(shinyjs)
-library(plyr)
+
 
 
 # Include necessary JavaScript libraries
@@ -268,7 +268,7 @@ ui <- dashboardPage(
         p("* Start by loggin in: from the sidebar on the left, (1) select a location and (2) breeder name."),
         p("* Then, chose an (3) inventory date."),
         p("* Next, (4) Click on the 'Get Flower Inventory' button"),
-        p("* After that, move to the Flowering Inventory tab to view your data and sort flowering clones by gender"),
+        p("* After that, move to the Flowering Inventory tab to view your inventory data"),
         p("* You can then click on other tabs to explore related breeding data"),
         p("Follow ", a(href="https://github.com/USDA-ARS-GBRU/SugarcaneCrossingTool", "this link"), " to the github repo for detailed instructions."),
        

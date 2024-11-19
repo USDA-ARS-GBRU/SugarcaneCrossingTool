@@ -21,7 +21,7 @@ crosses_iid_map<-list(
 brap <- brapi::as.ba_db(
   secure = FALSE,
   protocol = "https://",
-  db =Sys.getenv("URL"),
+  db ="sugarcanebase.breedinginsight.net",
   port = 80,
   apipath = NULL,
   multicrop = FALSE,
@@ -38,7 +38,7 @@ brap <- brapi::as.ba_db(
 brap2 <- brapi::as.ba_db(
   secure = FALSE,
   protocol = "https://",
-  db =  Sys.getenv("URL"),
+  db =  "sugarcanebase.breedinginsight.net",
   port = 80,
   apipath = NULL,
   multicrop = FALSE,
