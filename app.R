@@ -763,14 +763,14 @@ server <- function(input, output, session) {
     # Run optimization
     optimized_crosses <- tryCatch({
       optimize_crosses(inventory_data, 
-                       male_parents,
-                       female_parents,
+                       male_parents=male_parents,
+                       female_parents=female_parents,
                        n_crosses = input$n_crosses,
                        #min_crosses_per_parent = 1,
                        max_crosses_per_parent = input$max_crosses_per_parent,
                        # min_crosses_per_parent = input$min_crosses_per_parent,
                        culling_k = input$culling_k,
-                       prop_sel = input$prop_sel,
+                       #prop_sel = input$prop_sel,
                        blup=blup_data[,1:4],
                        amat=as.matrix(parent_amat),
                        weights=c(input$brix, input$biomass, input$ratoon))
@@ -792,7 +792,7 @@ server <- function(input, output, session) {
         datatable(optimized_crosses$crosses, 
                  options = list(
                    scrollX = TRUE,
-                   fixedColumns = list(leftColumns = 2),
+                   fixedColumns = list(leftColumns = 3),
                    pageLength = 10
                  ))
       } else {
@@ -820,13 +820,13 @@ server <- function(input, output, session) {
         )
         
         # Add additional information if available
-        if ("Seed.Quantity" %in% names(plot_data)) {
+        if ("Seed.Quantity.grams" %in% names(plot_data)) {
           hover_text <- paste(hover_text, 
                             "\nSeed Quantity:", plot_data$Seed.Quantity)
         }
-        if ("Number.of.Crosses" %in% names(plot_data)) {
+        if ("Previous.Cross.Names" %in% names(plot_data)) {
           hover_text <- paste(hover_text, 
-                            "\nPrevious Crosses:", plot_data$Number.of.Crosses)
+                            "\nPrevious Crosses:", plot_data$Previous.Cross.Names)
         }
         
         # Create new ggplot with hover text and vertical line
@@ -870,14 +870,14 @@ server <- function(input, output, session) {
           )
       }
     })
-    output$optimization_plot <- renderPlot({
-      if (!is.null(optimized_crosses$plot)) {
-        optimized_crosses$plot
-      } else {
-        plot(0, 0, type = "n", axes = FALSE, xlab = "", ylab = "")
-        text(0, 0, "No plot available", cex = 1.5)
-      }
-    })
+    # output$optimization_plot <- renderPlot({
+    #   if (!is.null(optimized_crosses$plot)) {
+    #     optimized_crosses$plot
+    #   } else {
+    #     plot(0, 0, type = "n", axes = FALSE, xlab = "", ylab = "")
+    #     text(0, 0, "No plot available", cex = 1.5)
+    #   }
+    # })
 
     output$download_optimized_plan <- downloadHandler(
   filename = function() {

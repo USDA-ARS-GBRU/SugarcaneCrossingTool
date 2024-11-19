@@ -10,7 +10,7 @@ parent_amat<-read.csv("data/ParentAmatrix.csv", row.names=1, check.names=F)
 ## INIT DB CONNECTION ----------------------
 
 location_iid_map <- list(
-  "Florida" = "3687",  #needs to be updated each year
+  "Florida" = "3696",  #needs to be updated each year
   "Louisiana" = "3678"  #needs to be updated each year
 )
 
