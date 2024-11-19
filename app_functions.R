@@ -192,7 +192,7 @@ createPedigreeGraph <- function(data, selected_clone_id = NULL) {
 }
 
 optimize_crosses <- function(inventory_data, male_parents, female_parents, n_crosses, max_crosses_per_parent, culling_k, blup, amat, weights) {
- stopifnot((sum(weights)-1)<0.1)
+ 
 
    # Filter inventory data for selected parents
   selected_parents <- c(male_parents, female_parents)
@@ -220,7 +220,7 @@ optimize_crosses <- function(inventory_data, male_parents, female_parents, n_cro
   # rownames(dummy_K) <- colnames(dummy_K) <- selected_parents
   # 
   # Create custom crossing plan ensuring females and males are correctly assigned
-  cross_plan <- SimpleMating::planCross(TargetPop = female_parents, TargetPop2 = male_parents)
+  cross_plan <- SimpleMating::planCross(TargetPop = female_parents, TargetPop2 = male_parents, MateDesign="half")
   
   # Debug print
   print("Cross plan:")

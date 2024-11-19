@@ -507,7 +507,7 @@ ui <- dashboardPage(
                        min = 0, max = 1, value = 1, step = 0.05),
             
             p(strong("Trait Weights:")),
-            p("Sum of weights must equal 1."),
+            textOutput("weight_sum_warning"),
             numericInput(inputId="brix", label="Average Brix", value = round(1/3,1)),
             numericInput(inputId="biomass", label="Total Biomass", value = round(1/3,1)),
             numericInput(inputId="ratoon", label="Ratooning Ability", value = round(1/3,1)),
@@ -523,7 +523,7 @@ ui <- dashboardPage(
         fluidRow(
           box(
             title = "Optimization Visualization",
-            plotOutput("optimization_plot")
+            plotlyOutput("optimization_plot")
           )
         )
       )
@@ -754,6 +754,8 @@ server <- function(input, output, session) {
     male_parents <- as.data.frame(inventory_init()$male)$Clone
     female_parents <- as.data.frame(inventory_init()$female)$Clone
     
+    ck<-input$culling_k
+    
     # Check if parents are selected
     if (length(male_parents) == 0 || length(female_parents) == 0) {
       showNotification("Please select both male and female parents before running optimization.", type = "error")
@@ -807,12 +809,12 @@ server <- function(input, output, session) {
         plot_data <- optimized_crosses$plot$data
         
         # Add rank column and selected status
-        plot_data$Rank <- 1:nrow(plot_data)
-        plot_data$Selected <- plot_data$Rank <= input$n_crosses
+        #plot_data$Rank <- 1:nrow(plot_data)
+        #plot_data$Selected <- plot_data$Rank <= input$n_crosses
         
         # Create hover text based on available columns
         hover_text <- paste(
-          "Rank:", plot_data$Rank,
+          #"Rank:", plot_data$Rank,
           "\nParent1:", plot_data$Parent1,
           "\nParent2:", plot_data$Parent2,
           "\nSelection Index:", round(plot_data$Y, 3),
@@ -832,9 +834,9 @@ server <- function(input, output, session) {
         # Create new ggplot with hover text and vertical line
         p <- ggplot(plot_data, aes(x = K, y = Y)) +
           # Color points based on selection status
-          geom_point(aes(color = Selected), size = 3, alpha = 0.7) +
-          scale_color_manual(values = c("FALSE" = "gray70", "TRUE" = "#1f77b4")) +
-          geom_vline(xintercept = input$culling_k, linetype = "dashed", 
+          geom_point(aes(color = Sel), size = 3, alpha = 0.7) +
+          #scale_color_manual(values = c("Non-Selected" = "gray", "Mating Plan" = "blue")) +
+          geom_vline(xintercept = ck, linetype = "dashed", 
                     color = "red", size = 1) +
           theme_minimal() +
           theme(
@@ -870,6 +872,18 @@ server <- function(input, output, session) {
           )
       }
     })
+     
+  
+     # Add weight sum warning
+     output$weight_sum_warning <- renderText({
+       total_weight <- input$brix + input$biomass + input$ratoon
+       if (abs(total_weight - 1) > 0.01) {
+         return(paste("Warning: Weights sum to", round(total_weight, 2), "- should equal 1"))
+       } else {
+         return(paste("Weights sum to", round(total_weight, 2)))
+       }
+     })
+  
     # output$optimization_plot <- renderPlot({
     #   if (!is.null(optimized_crosses$plot)) {
     #     optimized_crosses$plot
