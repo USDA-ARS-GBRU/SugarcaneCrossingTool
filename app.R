@@ -456,6 +456,10 @@ ui <- dashboardPage(
       ### Crosses tab content ----
       tabItem(
         tabName = "crosses",
+        tabsetPanel(
+          type = "tabs",
+          tabPanel(
+            "Previous Crosses",
         fluidRow(
           box(
             title="Previous crosses made with selected clones",
@@ -464,12 +468,31 @@ ui <- dashboardPage(
               inputId = "makecrosses",
               label = "Get Data on Previous Crosses and Seedlots"
             ),
-            p("This table shows a count of", strong("previous"), "made with your selected clones. It also shows the total number of progeny and availablity of seedlots for these crosses. This table is filtered based on categorizatons made in step 5.
+            p("This table shows a count of", strong("previous"), "crosses made with your selected clones. It also shows the total number of progeny and availablity of seedlots for these crosses. This table is filtered based on categorizatons made in step 5.
               If the cross was made earlier this year, the 'Progeny.Per.Cross' column will read 'None yet, new cross this year'.")
           )
         ),
         DTOutput("crossesTable")
       ),
+      tabPanel(
+        "Previous Reciprocal Crosses",
+        fluidRow(
+          box(
+            title="Previous RECIPROCAL crosses made with selected clones",
+            width=12,
+            actionButton(
+              inputId = "makerecipcrosses",
+              label = "Get Data on Previous RECIPROCAL Crosses and Seedlots"
+            ),
+            p("This table shows a count of", strong("previous RECIPROCAL"), "crosses made with your selected clones. It also shows the total number of progeny and availablity of seedlots for these crosses. This table is filtered based on categorizatons made in step 5.
+              If the cross was made earlier this year, the 'Progeny.Per.Cross' column will read 'None yet, new cross this year'.")
+          )
+        ), 
+        DTOutput("recipCrossesTable")
+      )
+      )
+      )
+      ,
 
   
 
@@ -641,6 +664,7 @@ server <- function(input, output, session) {
   # Add reactiveValues for sharing data between modules
   rv <- reactiveValues(
     previous_crosses = NULL,
+    recip_previous_crosses=NULL,
     selectedColumns = NULL
   )
   
