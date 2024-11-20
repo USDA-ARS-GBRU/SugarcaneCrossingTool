@@ -276,7 +276,14 @@ optimize_crosses <- function(inventory_data, male_parents, female_parents, n_cro
   }
   
   # Prepare output
-  crosses <- optimized_plan[[2]]
+  crosses <- optimized_plan[[2]] %>% 
+    left_join(y=blup %>% rename(Female.Parent=Clone)) %>%
+    left_join(y=blup %>% rename(Male.Parent=Clone), by="Male.Parent")
+ 
+  optimized_plan[[3]]$data<- optimized_plan[[3]]$data %>% 
+    left_join(y=blup %>% rename(Parent1=Clone)) %>%
+    left_join(y=blup %>% rename(Parent2=Clone), by="Parent2")
+  
   plot <- optimized_plan[[3]]
   
   return(list(crosses = crosses, plot = plot))
