@@ -296,73 +296,73 @@ ui <- dashboardPage(
       ### Inventory content -----
       tabItem(
         tabName = "flowering",
+
+        fluidRow(
+
+
+          box(
+            title = "Step 5: Sorting",
+            p("Drag and drop the available flowering clones into their appropriate category.", strong("Only"), "sorted clones will be displayed in subsequent tabs and/or used in cross prediction so this step must be done first."),
+            width = 12,
+            fluidRow(
+              column(
+                width = 4,
+                h4("Available Clones"),
+                uiOutput("available_clones")
+              ),
+              column(
+                width = 4,
+                h4("Female Parents"),
+                uiOutput("female_parents")
+              ),
+              column(
+                width = 4,
+                h4("Male Parents"),
+                uiOutput("male_parents")
+              )
+            )
+          )
+        ),
+
         
         # fluidRow(
         # 
-        # 
         #   box(
-        #     title = "Step 5: Sorting",
-        #     p("Drag and drop the available flowering clones into their appropriate category.", strong("Only"), "sorted clones will be displayed in subsequent tabs and/or used in cross prediction so this step must be done first."),
+        #     title = "Inventory",
+        #     p("These tables show the number and location of male and female clones flowering today"),
         #     width = 12,
         #     fluidRow(
         #       column(
         #         width = 4,
-        #         h4("Available Clones"),
-        #         uiOutput("available_clones")
+        #         h4("Male Clones"),
+        #         DTOutput("inventoryTableMale")
         #       ),
         #       column(
         #         width = 4,
-        #         h4("Female Parents"),
-        #         uiOutput("female_parents")
-        #       ),
-        #       column(
-        #         width = 4,
-        #         h4("Male Parents"),
-        #         uiOutput("male_parents")
+        #         h4("Female Clones"),
+        #         DTOutput("inventoryTableFemale")
+        #       
         #       )
         #     )
         #   )
-        # ),
+        # ), 
+        # 
 
-        
         fluidRow(
-
-          box(
-            title = "Inventory",
-            p("These tables show the number and location of male and female clones flowering today"),
-            width = 12,
+        box(title="These tables shows you all parents flowering today, sorted into male and female columns based on techician's inventory",
+             textOutput("dataSourceText"),
+            width=12,
             fluidRow(
-              column(
-                width = 6,
-                h4("Male Clones"),
+              box(
+                width=4,
                 DTOutput("inventoryTableMale")
               ),
-              column(
-                width = 6,
-                h4("Female Clones"),
+             box(
+                width=4,
                 DTOutput("inventoryTableFemale")
-              
               )
-            )
-          )
-        )
-        
+            ))),
 
-        # fluidRow(
-        # box(title="These tables shows you Male Parents flowering today",
-        #      textOutput("dataSourceText"),
-        #     width=12,
-        #     fluidRow(
-        #       column(
-        #         width=4, 
-        #         DTOutput("inventoryTableMale"),
-        #       ),
-        #       column(
-        #         width=4, 
-        #         DTOutput("inventoryTableFemale"),
-        #       )
-        #     ))),
-        # 
        
 
 
