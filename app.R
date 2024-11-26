@@ -573,44 +573,44 @@ ui <- dashboardPage(
   )
 )
 
-inventory_init <<- eventReactive(input$brapipull, withProgress(message = "Pulling Inventory Data", {
-  tryCatch({
-    
-    inven <- data.frame(brapi::ba_studies_table(con = brap, studyDbId = reactive_iid(), rclass="data.frame")) %>%
-      filter(observationLevel == "plot") %>% # select just plant rows
-      set_names(~(.)%>% str_replace_all("SUGARCANE.*","") %>% str_replace_all("\\.","")) %>% # take CO term out of colnames
-      mutate_at('blockNumber', as.factor)
-    
-    inven$blockNumber<-revalue(inven$blockNumber, c("1"="West", "2"="East", "3"="Railcarts", "4"="Back"))
-    
-    inven_male<-filter(inven, grepl(reactive_date(),TasselCountMale)) %>% 
-      select(germplasmName, blockNumber, notes, TasselCountMale) %>% 
-      separate(TasselCountMale, into=c("Count",NA), sep=",") %>%
-      group_by(germplasmName)
-    
-    male<-merge(aggregate(as.numeric(Count)~germplasmName,inven_male, sum ),
-                aggregate(blockNumber~germplasmName,inven_male, function(x) paste(unique(x), collapse=":")))
-    
-    inven_female<-filter(inven, grepl(reactive_date(),TasselCountFemale)) %>% 
-      select(germplasmName, blockNumber, notes, TasselCountFemale) %>% 
-      separate(TasselCountFemale, into=c("Count",NA), sep=",") %>%
-      group_by(germplasmName)
-    
-    female<-merge(aggregate(as.numeric(Count)~germplasmName,inven_female, sum ),
-                  aggregate(blockNumber~germplasmName,inven_female, function(x) paste0(unique(x), collapse=":")))
-    
-    colnames(male)<-colnames(female)<-c("Clone", "FlowerCount", "Location")
-    
-    inven2<-list(male, female)
-    names(inven2)<-c("male", "female")
-    
-    dataSource("Data pulled from BrAPI")
-    inven2
-  }, error = function(e) {
-    dataSource("Saved data is being rendered")
-    data.frame(Clone = character(), FloweringCount = numeric(), Location = character()) # Return an empty data frame with the expected columns
-  })
-}))
+# inventory_init <<- eventReactive(input$brapipull, withProgress(message = "Pulling Inventory Data", {
+#   tryCatch({
+#     
+#     inven <- data.frame(brapi::ba_studies_table(con = brap, studyDbId = reactive_iid(), rclass="data.frame")) %>%
+#       filter(observationLevel == "plot") %>% # select just plant rows
+#       set_names(~(.)%>% str_replace_all("SUGARCANE.*","") %>% str_replace_all("\\.","")) %>% # take CO term out of colnames
+#       mutate_at('blockNumber', as.factor)
+#     
+#     inven$blockNumber<-revalue(inven$blockNumber, c("1"="West", "2"="East", "3"="Railcarts", "4"="Back"))
+#     
+#     inven_male<-filter(inven, grepl(reactive_date(),TasselCountMale)) %>% 
+#       select(germplasmName, blockNumber, notes, TasselCountMale) %>% 
+#       separate(TasselCountMale, into=c("Count",NA), sep=",") %>%
+#       group_by(germplasmName)
+#     
+#     male<-merge(aggregate(as.numeric(Count)~germplasmName,inven_male, sum ),
+#                 aggregate(blockNumber~germplasmName,inven_male, function(x) paste(unique(x), collapse=":")))
+#     
+#     inven_female<-filter(inven, grepl(reactive_date(),TasselCountFemale)) %>% 
+#       select(germplasmName, blockNumber, notes, TasselCountFemale) %>% 
+#       separate(TasselCountFemale, into=c("Count",NA), sep=",") %>%
+#       group_by(germplasmName)
+#     
+#     female<-merge(aggregate(as.numeric(Count)~germplasmName,inven_female, sum ),
+#                   aggregate(blockNumber~germplasmName,inven_female, function(x) paste0(unique(x), collapse=":")))
+#     
+#     colnames(male)<-colnames(female)<-c("Clone", "FlowerCount", "Location")
+#     
+#     inven2<-list(male, female)
+#     names(inven2)<-c("male", "female")
+#     
+#     dataSource("Data pulled from BrAPI")
+#     inven2
+#   }, error = function(e) {
+#     dataSource("Saved data is being rendered")
+#     data.frame(Clone = character(), FloweringCount = numeric(), Location = character()) # Return an empty data frame with the expected columns
+#   })
+# }))
 
 
 
@@ -726,24 +726,14 @@ server <- function(input, output, session) {
   })
     
 
-# Reactive value to store the current state of clone assignments
-
-clone_assignments <- reactiveVal(list(female = character(),male = character()))
-  
-
-observe({
-  females<-unique(inventory_init()$female$Clone)
-  males <- unique(inventory_init()$male$Clone)
-  clone_assignments(list(female=females, male = males))
-})
-
+#### Sorting section for inventory
 
 
 output$male_parents <- renderUI({
 
     rank_list(
       text = "Drag male parents here",
-      labels = clone_assignments()$male,
+      labels = inventory_init()$male$Clone,
       input_id = "male_list",
       options=sortable_options(group="clone_buckets"),
       orientation = "vertical",
@@ -753,7 +743,7 @@ output$male_parents <- renderUI({
 output$female_parents <- renderUI({
     rank_list(
       text = "Drag female parents here",
-      labels = clone_assignments()$female,
+      labels = inventory_init()$female$Clone,
       input_id = "female_list",
       options=sortable_options(group="clone_buckets"),
       orientation = "vertical",
@@ -764,21 +754,14 @@ output$female_parents <- renderUI({
 
 output$results_1 <-
   renderPrint(
-    input$female_list # This matches the input_id of the first rank list
+    unique(input$female_list) # This matches the input_id of the first rank list
   )
 output$results_2 <-
   renderPrint(
-    input$male_list # This matches the input_id of the second rank list
+    unique(input$male_list) # This matches the input_id of the second rank list
   )
 
 
-# Update clone assignments when lists change
-observe({
-  clone_assignments(list(
-    female = input$female_list,
-    male = input$male_list
-  ))
-})
 
 
 
