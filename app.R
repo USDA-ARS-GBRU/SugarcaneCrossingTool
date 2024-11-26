@@ -305,11 +305,11 @@ ui <- dashboardPage(
             p("Drag and drop the available flowering clones into their appropriate category.", strong("Only"), "sorted clones will be displayed in subsequent tabs and/or used in cross prediction so this step must be done first."),
             width = 12,
             fluidRow(
-              column(
-                width = 4,
-                h4("Available Clones"),
-                uiOutput("available_clones")
-              ),
+              # column(
+              #   width = 4,
+              #   h4("Available Clones"),
+              #   uiOutput("available_clones")
+              # ),
               column(
                 width = 4,
                 h4("Female Parents"),
@@ -353,14 +353,14 @@ ui <- dashboardPage(
              textOutput("dataSourceText"),
             width=12,
             fluidRow(
-              box(
+              box(column(
                 width=4,
                 DTOutput("inventoryTableMale")
-              ),
-             box(
+              )),
+             box(column(
                 width=4,
                 DTOutput("inventoryTableFemale")
-              )
+              ))
             ))),
 
        
@@ -710,12 +710,22 @@ server <- function(input, output, session) {
  # Reactive value to store the current state of clone assignments
   #clone_assignments <- reactiveVal(list(available = character(), male = character(), female = character()))
   
+clone_assignments <- reactiveVal(list(male = character(), female = character()))
+  
+  
   # Initialize available clones
   # observe({
   #   inventory_data <- inventory_init()
   #   clones <- unique(inventory_data$Clone)
   #   clone_assignments(list(available = clones, male = character(), female = character()))
   # })
+
+observe({
+  inventory_data <- inventory_init()
+  males <- unique(inventory_data$female$Clone)
+  females<-unique(inventory_data$female$Clone)
+  clone_assignments(list(male = males, female =females))
+})
 
 
   
@@ -767,7 +777,46 @@ server <- function(input, output, session) {
   #     female = input$female_list
   #   ))
   # })
+
+
+output$male_parents <- renderUI({
+  bucket_list(
+    header = "Male Parents",
+    group_name = "clone_buckets",
+    orientation = "vertical",
+    add_rank_list(
+      text = "Drag male parents here",
+      labels = clone_assignments()$male,
+      input_id = "male_list"
+    )
+  )
+})
+
+output$female_parents <- renderUI({
+  bucket_list(
+    header = "Female Parents",
+    group_name = "clone_buckets",
+    orientation = "vertical",
+    add_rank_list(
+      text = "Drag female parents here",
+      labels = clone_assignments()$female,
+      input_id = "female_list"
+    )
+  )
+})
+
+# Update clone assignments when lists change
+observe({
+  clone_assignments(list(
+    male = input$male_list,
+    female = input$female_list
+  ))
+})
+
   
+
+
+
   # Cross Optimization
   observeEvent(input$run_optimization, {
     # Get current inventory data

@@ -42,14 +42,14 @@ flowering_server <- function(input, output, session, reactive_date, reactive_iid
   
   
   output$inventoryTableMale <- ({
-    renderDT(inventory_init()$male, options = list(language = list(
+    renderDT(inventory_init()$male %>% select(!germplasmDbId), options = list(language = list(
       zeroRecords = "There are no records to display. Double check the date you selected and try again. 
       You may need to wait a few minutes if inventory records were recently uploaded"
     )))
   })
   
   output$inventoryTableFemale <- ({
-    renderDT(inventory_init()$female, options = list(language = list(
+    renderDT(inventory_init()$female%>% select(!germplasmDbId), options = list(language = list(
       zeroRecords = "There are no records to display. Double check the date you selected and try again. 
       You may need to wait a few minutes if inventory records were recently uploaded"
     )))
