@@ -297,6 +297,25 @@ ui <- dashboardPage(
       tabItem(
         tabName = "flowering",
 
+        
+        fluidRow(
+          column(
+            width = 12,
+            tags$b("Result"),
+            column(
+              width = 12,
+              
+              tags$p("input$female_list"),
+              verbatimTextOutput("results_1"),
+              
+              tags$p("input$male_list"),
+              verbatimTextOutput("results_2"),
+              
+            )
+          )
+        )
+        ,
+          
         fluidRow(
 
 
@@ -348,22 +367,22 @@ ui <- dashboardPage(
         # ), 
         # 
 
-        fluidRow(
-        box(title="These tables shows you all parents flowering today, sorted into male and female columns based on techician's inventory",
-             textOutput("dataSourceText"),
-            width=12,
-            fluidRow(
-              box(column(
-                width=4,
-                DTOutput("inventoryTableMale")
-              )),
-             box(column(
-                width=4,
-                DTOutput("inventoryTableFemale")
-              ))
-            ))),
-
-       
+        # fluidRow(
+        # box(title="These tables shows you all parents flowering today, sorted into male and female columns based on techician's inventory",
+        #      textOutput("dataSourceText"),
+        #     width=12,
+        #     fluidRow(
+        #       box(column(
+        #         width=4,
+        #         DTOutput("inventoryTableMale")
+        #       )),
+        #      box(column(
+        #         width=4,
+        #         DTOutput("inventoryTableFemale")
+        #       ))
+        #     ))),
+        # 
+        # 
 
 
         
@@ -707,113 +726,59 @@ server <- function(input, output, session) {
   })
     
 
- # Reactive value to store the current state of clone assignments
-  #clone_assignments <- reactiveVal(list(available = character(), male = character(), female = character()))
+# Reactive value to store the current state of clone assignments
+
+clone_assignments <- reactiveVal(list(female = character(),male = character()))
   
-clone_assignments <- reactiveVal(list(male = character(), female = character()))
-  
-  
-  # Initialize available clones
-  # observe({
-  #   inventory_data <- inventory_init()
-  #   clones <- unique(inventory_data$Clone)
-  #   clone_assignments(list(available = clones, male = character(), female = character()))
-  # })
 
 observe({
-  inventory_data <- inventory_init()
-  males <- unique(inventory_data$female$Clone)
-  females<-unique(inventory_data$female$Clone)
-  clone_assignments(list(male = males, female =females))
+  females<-unique(inventory_init()$female$Clone)
+  males <- unique(inventory_init()$male$Clone)
+  clone_assignments(list(female=females, male = males))
 })
 
-
-  
-  # Render sortable lists
-  # output$available_clones <- renderUI({
-  #   bucket_list(
-  #     header = "Available Clones",
-  #     group_name = "clone_buckets",
-  #     orientation = "vertical",
-  #     add_rank_list(
-  #       text = "Drag clones from here",
-  #       labels = clone_assignments()$available,
-  #       input_id = "available_list"
-  #     )
-  #   )
-  # })
-  # 
-  # output$male_parents <- renderUI({
-  #   bucket_list(
-  #     header = "Male Parents",
-  #     group_name = "clone_buckets",
-  #     orientation = "vertical",
-  #     add_rank_list(
-  #       text = "Drag male parents here",
-  #       labels = clone_assignments()$male,
-  #       input_id = "male_list"
-  #     )
-  #   )
-  # })
-  
-  # output$female_parents <- renderUI({
-  #   bucket_list(
-  #     header = "Female Parents",
-  #     group_name = "clone_buckets",
-  #     orientation = "vertical",
-  #     add_rank_list(
-  #       text = "Drag female parents here",
-  #       labels = clone_assignments()$female,
-  #       input_id = "female_list"
-  #     )
-  #   )
-  # })
-  # 
-  # Update clone assignments when lists change
-  # observe({
-  #   clone_assignments(list(
-  #     available = input$available_list,
-  #     male = input$male_list,
-  #     female = input$female_list
-  #   ))
-  # })
 
 
 output$male_parents <- renderUI({
-  bucket_list(
-    header = "Male Parents",
-    group_name = "clone_buckets",
-    orientation = "vertical",
-    add_rank_list(
+
+    rank_list(
       text = "Drag male parents here",
       labels = clone_assignments()$male,
-      input_id = "male_list"
+      input_id = "male_list",
+      options=sortable_options(group="clone_buckets"),
+      orientation = "vertical",
     )
-  )
 })
 
 output$female_parents <- renderUI({
-  bucket_list(
-    header = "Female Parents",
-    group_name = "clone_buckets",
-    orientation = "vertical",
-    add_rank_list(
+    rank_list(
       text = "Drag female parents here",
       labels = clone_assignments()$female,
-      input_id = "female_list"
-    )
+      input_id = "female_list",
+      options=sortable_options(group="clone_buckets"),
+      orientation = "vertical",
+      
+
   )
 })
+
+output$results_1 <-
+  renderPrint(
+    input$female_list # This matches the input_id of the first rank list
+  )
+output$results_2 <-
+  renderPrint(
+    input$male_list # This matches the input_id of the second rank list
+  )
+
 
 # Update clone assignments when lists change
 observe({
   clone_assignments(list(
-    male = input$male_list,
-    female = input$female_list
+    female = input$female_list,
+    male = input$male_list
   ))
 })
-
-  
 
 
 
