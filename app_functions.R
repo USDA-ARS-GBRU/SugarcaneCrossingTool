@@ -31,68 +31,66 @@ PedMatrix <- function(pedigree) {
 }
 
 InitCrossTable <- function(cross_list, Cross.Name="Cross.Unique.ID", Female.Parent = "Female.Parent", Male.Parent = "Male.Parent", new_crosses = F, germplasm) {
-  
-  
-  if (dim(cross_list)[2] == 1) {
-    # if cross list is empty (first day)
-    return(NULL)
-  }
-  
-  #filter first! goes faster
-  cross_list2<-cross_list[which(cross_list$Female.Parent %in% germplasm$Clone & cross_list$Male.Parent %in% germplasm$Clone), ]
-  
- 
-  
-  if(dim(cross_list2)[1]==0){
-    return(NULL)
-  }
-  
-  if (new_crosses==F) {
-
-  ### get seedlot information
+  tryCatch({
+    # Input validation
+    if(is.null(cross_list) || !is.data.frame(cross_list)) {
+      warning("cross_list is NULL or not a data frame")
+      return(data.frame())
+    }
     
-  seeds<-brapi::ba_seedlots_details(con=brap2, 
-                               crossName=gsub("^crossName=|&$", "", 
-                                              paste(paste0("crossName=",
-                                                           cross_list2$Cross.Unique.ID, "&"),
-                                                    collapse="")), 
-                               rclass="data.frame")
- 
-  seeds$data.amount<-as.numeric(as.character(seeds$data.amount))
-  
-  seeds$Cross.Unique.ID<-gsub("SL-", "", seeds$data.seedLotName)
-   
-  #join with subset cross list
-  cross_list2<-cross_list2 %>% left_join(seeds, by="Cross.Unique.ID")
-  
-  #aggregate
-  cross_table<-as.data.frame(aggregate(Cross.Unique.ID ~ Female.Parent + Male.Parent, FUN = c, data = cross_list2)) %>% 
-    left_join(as.data.frame(aggregate(Number.of.Progenies ~ Female.Parent + Male.Parent, FUN = sum, data = cross_list2))) %>% 
-    left_join(  as.data.frame(aggregate(data.amount ~ Female.Parent + Male.Parent, FUN = sum, data = cross_list2)))
-  
-  cross_table$total.crosses<-apply(cross_table, 1, function(x) {length(x$Cross.Unique.ID)})
-  
-  #cleanup
-  colnames(cross_table)<-c("Female.Parent", "Male.Parent", "Total.Number.of.Progenies", "Seed.Quantity.grams", "Number.of.Crosses", "Cross.Names")    
-  
-  cross_table<-cross_table[,c(1:2, 3:6)]
+    if(ncol(cross_list) < 2) {
+      warning("cross_list has insufficient columns")
+      return(data.frame())
+    }
     
-  return(cross_table)
-
-  } else {
-
-    # #using current crosses from this year
-    cross_table<-as.data.frame(aggregate(data.crossName~ data.parent1.germplasmName + data.parent2.germplasmName, FUN = c, data = cross_list))
-    colnames(cross_table)<-c("Female.Parent", "Male.Parent", "Cross.Names")
-    cross_table$Number.of.Crosses<-apply(cross_table, 1, function(x) {length(x$Cross.Names)})
-    cross_table<-cross_table %>% mutate(Seed.Quantity.grams="none yet - cross made this year", Total.Number.of.Progenies="none yet- cross made this year")
-
-    cross_table<-cross_table[,c(1:2, 4:6, 3)]
-
-    return(cross_table)
-  }
+    #filter first! goes faster
+    cross_list2 <- cross_list[which(cross_list[[Female.Parent]] %in% germplasm$Clone & 
+                                   cross_list[[Male.Parent]] %in% germplasm$Clone), ]
+    
+    if(nrow(cross_list2) == 0) {
+      warning("No matching crosses found after filtering")
+      return(data.frame())
+    }
+    
+    if(new_crosses == FALSE) {
+      ### get seedlot information
+      tryCatch({
+        cross_names <- gsub("^crossName=|&$", "", 
+                           paste(paste0("crossName=",
+                                      cross_list2[[Cross.Name]], "&"),
+                                 collapse=""))
+        
+        seeds <- brapi::ba_seedlots_details(
+          con = brap2, 
+          crossName = cross_names, 
+          rclass = "data.frame"
+        )
+        
+        if(!is.data.frame(seeds) || nrow(seeds) == 0) {
+          warning("No seedlot data returned")
+          return(data.frame())
+        }
+        
+        seeds$data.amount <- as.numeric(as.character(seeds$data.amount))
+        seeds[[Cross.Name]] <- gsub("SL-", "", seeds$data.seedLotName)
+        
+        #join with subset cross list
+        cross_list2 <- cross_list2 %>% 
+          left_join(seeds, by = Cross.Name)
+        
+      }, error = function(e) {
+        warning(paste("Error getting seedlot details:", e$message))
+        return(data.frame())
+      })
+    }
+    
+    return(cross_list2)
+    
+  }, error = function(e) {
+    warning(paste("Error in InitCrossTable:", e$message))
+    return(data.frame())
+  })
 }
-
 
 createPedigreeGraph <- function(data, selected_clone_id = NULL) {
   tryCatch({

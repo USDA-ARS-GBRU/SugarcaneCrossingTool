@@ -24,7 +24,6 @@ performance_server <- function(input, output, session, reactive_iid, rv, rv_trai
           incProgress(1/total, detail = paste("Processing clone", i, "of", total))
           dbId <- germplasm$germplasmDbId[i]
           tryCatch({
-            # Convert the API response to a data frame explicitly
             pheno_data <- ba_phenotypes_search(
               con = brap,
               germplasmDbId = as.character(dbId),
@@ -32,13 +31,37 @@ performance_server <- function(input, output, session, reactive_iid, rv, rv_trai
               observationLevel = "plot",
               pageSize = 20000
             )
+            
             if(is.data.frame(pheno_data)) {
+              # Clean the observations.value column
+              pheno_data$observations.value <- trimws(as.character(pheno_data$observations.value))
+              
+              # Remove any empty or invalid values
+              pheno_data <- pheno_data[!is.na(pheno_data$observations.value) & 
+                                      pheno_data$observations.value != "" & 
+                                      !is.null(pheno_data$observations.value), ]
+              
+              # Convert to numeric, with better error handling
+              pheno_data$observations.value <- suppressWarnings(
+                as.numeric(pheno_data$observations.value)
+              )
+              
+              # Remove any rows where conversion failed
+              valid_rows <- !is.na(pheno_data$observations.value)
+              if(!all(valid_rows)) {
+                warning(sprintf("Removed %d invalid numeric values for clone %s", 
+                               sum(!valid_rows), dbId))
+              }
+              pheno_data <- pheno_data[valid_rows, ]
+              
               return(pheno_data)
             } else {
-              return(as.data.frame(pheno_data))
+              warning(sprintf("Unexpected data format for clone %s: %s", 
+                             dbId, class(pheno_data)))
+              return(NULL)
             }
           }, error = function(e) {
-            warning(paste("Error fetching phenotypes for ID:", dbId))
+            warning(sprintf("Error fetching phenotypes for ID %s: %s", dbId, e$message))
             NULL
           })
         })
@@ -111,7 +134,9 @@ performance_server <- function(input, output, session, reactive_iid, rv, rv_trai
         showNotification(paste("Error getting performance data:", e$message), type = "error", duration = NULL)
         return(data.frame())
       }, warning = function(w) {
-        showNotification(paste("Warning:", w$message), type = "warning")
+        showNotification(paste("Warning during data processing:", w$message), 
+                        type = "warning",
+                        duration = 10)
       })
     })
   })
