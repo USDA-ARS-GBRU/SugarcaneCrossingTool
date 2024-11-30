@@ -508,23 +508,44 @@ ui <- dashboardPage(
 
 
 # Define the inventory_init function as a global variable
-inventory_init <<- eventReactive(input$brapipull, withProgress(message = "Pulling Inventory Data", {
-  tryCatch({
-    inven <- data.frame(brapi::ba_studies_table(con = brap, studyDbId = reactive_iid(), rclass="data.frame")) %>%
-      filter(observationLevel == "plant") %>% # select just plant rows
-      set_names(~(.)%>% str_replace_all("SUGARCANE.*","") %>% str_replace_all("\\.","")) %>%  # take CO term out of colnames
-      filter(FloweringTime== reactive_date()) %>% 
-      select(germplasmName, germplasmDbId, SexMFWM) %>% 
-      group_by(germplasmName, germplasmDbId, SexMFWM) %>% 
-      summarise(count = n()) %>%
-      rename(Clone = germplasmName, FloweringCount = count, Sex = SexMFWM)
-    dataSource("Data pulled from BrAPI")
-    inven
-  }, error = function(e) {
-    dataSource("Saved data is being rendered")
-    data.frame(Clone = character(), FloweringCount = numeric(), Sex = character()) # Return an empty data frame with the expected columns
+inventory_init <<- eventReactive(input$brapipull, {
+  withProgress(message = "Pulling Inventory Data", {
+    tryCatch({
+      inven <- data.frame(brapi::ba_studies_table(con = brap, studyDbId = reactive_iid(), rclass="data.frame")) %>%
+        filter(observationLevel == "plant") %>%
+        set_names(~(.)%>% str_replace_all("SUGARCANE.*","") %>% str_replace_all("\\.","")) %>%
+        filter(FloweringTime == reactive_date()) %>%
+        select(germplasmName, germplasmDbId, SexMFWM) %>%
+        group_by(germplasmName, germplasmDbId, SexMFWM) %>%
+        summarise(count = n()) %>%
+        rename(Clone = germplasmName, FloweringCount = count, Sex = SexMFWM)
+      
+      dataSource("Data pulled from BrAPI")
+      inven
+      
+    }, error = function(e) {
+      # Show error notification to user
+      showNotification(
+        paste("Error pulling inventory data:", e$message),
+        type = "error",
+        duration = NULL
+      )
+      # Return empty dataframe with expected structure
+      dataSource("Error occurred - using empty dataset")
+      data.frame(
+        Clone = character(),
+        FloweringCount = numeric(),
+        Sex = character(),
+        stringsAsFactors = FALSE
+      )
+    }, warning = function(w) {
+      showNotification(
+        paste("Warning:", w$message),
+        type = "warning"
+      )
+    })
   })
-}))
+})
 
 # SERVER ---------------------------------------
 
@@ -852,6 +873,29 @@ server <- function(input, output, session) {
     } else {
       return(paste("Weights sum to", round(total_weight, 2)))
     }
+  })
+
+  # Add global error handler
+  options(shiny.error = function() {
+    # Log the error
+    cat(file=stderr(), "Error occurred:\n")
+    print(geterrmessage())
+    
+    # Show error to user
+    showNotification(
+      "An error occurred. The app will attempt to continue running.",
+      type = "error",
+      duration = NULL
+    )
+    
+    # Return empty/default values instead of crashing
+    return(NULL)
+  })
+
+  # Add session ended handler
+  session$onSessionEnded(function() {
+    cat("Session ended\n")
+    # Cleanup code here if needed
   })
 }
 

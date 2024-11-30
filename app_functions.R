@@ -1,25 +1,33 @@
 # create pedigree matrix
 PedMatrix <- function(pedigree) {
-  ped <- pedigree[, 1:3]
-  ## clean data
-  # recode NAs and blank cells as 0
-  ped[is.na(ped)] <- "0"
-  # ped$Female_Parent<-gsub("^$","0", ped$Female_Parent) 
-  # ped$Male_Parent<-gsub("^$","0", ped$Male_Parent)
-  # recode unknown accessions as 0
-  ped$Accession <- gsub("unknown", "0", ped$Accession, fixed = T)
-  ped$Male_Parent <- gsub("unknown", "0", ped$Male_Parent, fixed = T)
-  ped$Female_Parent <- gsub("unknown", "0", ped$Female_Parent, fixed = T)
-  # remove duplicate entries
-  ped <- ped[!duplicated(ped$Accession), ]
-  # get rid of unknown accessions in first column
-  ped <- ped[-which(ped$Accession == 0), ]
-  # convert characters to factors
-  str(ped)
-  ped <- as.data.frame(map_if(ped, is.character, as.factor))
-  # calculate rel matrix
-  relmat <- as.matrix(Amatrix(ped, ploidy = 10))
-  return(relmat)
+  tryCatch({
+    if (is.null(pedigree) || nrow(pedigree) == 0) {
+      return(matrix(nrow = 0, ncol = 0))
+    }
+    ped <- pedigree[, 1:3]
+    ## clean data
+    # recode NAs and blank cells as 0
+    ped[is.na(ped)] <- "0"
+    # ped$Female_Parent<-gsub("^$","0", ped$Female_Parent) 
+    # ped$Male_Parent<-gsub("^$","0", ped$Male_Parent)
+    # recode unknown accessions as 0
+    ped$Accession <- gsub("unknown", "0", ped$Accession, fixed = T)
+    ped$Male_Parent <- gsub("unknown", "0", ped$Male_Parent, fixed = T)
+    ped$Female_Parent <- gsub("unknown", "0", ped$Female_Parent, fixed = T)
+    # remove duplicate entries
+    ped <- ped[!duplicated(ped$Accession), ]
+    # get rid of unknown accessions in first column
+    ped <- ped[-which(ped$Accession == 0), ]
+    # convert characters to factors
+    str(ped)
+    ped <- as.data.frame(map_if(ped, is.character, as.factor))
+    # calculate rel matrix
+    relmat <- as.matrix(Amatrix(ped, ploidy = 10))
+    return(relmat)
+  }, error = function(e) {
+    warning("Error creating pedigree matrix:", e$message)
+    return(matrix(nrow = 0, ncol = 0))
+  })
 }
 
 InitCrossTable <- function(cross_list, Cross.Name="Cross.Unique.ID", Female.Parent = "Female.Parent", Male.Parent = "Male.Parent", new_crosses = F, germplasm) {
@@ -87,7 +95,10 @@ InitCrossTable <- function(cross_list, Cross.Name="Cross.Unique.ID", Female.Pare
 
 
 createPedigreeGraph <- function(data, selected_clone_id = NULL) {
-  if (!is.null(data) && nrow(data) > 0) {
+  tryCatch({
+    if (is.null(data) || nrow(data) == 0) {
+      return(NULL)
+    }
     # Create a data frame for nodes
     nodes <- data.frame(
       id = data$germplasmDbId,
@@ -174,106 +185,115 @@ createPedigreeGraph <- function(data, selected_clone_id = NULL) {
       visOptions(highlightNearest = list(enabled = TRUE, degree = 1))
     
     return(graph)
-  } else {
+  }, error = function(e) {
+    warning("Error creating pedigree graph:", e$message)
     return(NULL)
-  }
+  })
 }
 
 optimize_crosses <- function(inventory_data, male_parents, female_parents, n_crosses, max_crosses_per_parent, culling_k, prop_sel, blup, amat, weights) {
-  # Check if weights sum to 1 (within 1% tolerance)
-  if (abs(sum(weights) - 1) > 0.01) {
-    return(list(
-      crosses = data.frame(Message = "Error: Trait weights must sum to 1"),
-      plot = NULL
-    ))
-  }
-  
-  # Filter inventory data for selected parents
-  selected_parents <- c(male_parents, female_parents)
-  filtered_inventory <- inventory_data[inventory_data$Clone %in% selected_parents, ]
-  
-  # Debug print
-  print("Selected parents:")
-  print(selected_parents)
-  
-  blup<-blup[blup$Clone%in%selected_parents,]
-  amat<-as.matrix(amat[selected_parents, selected_parents])
-  
-  # # Create dummy BLUP values for two traits
-  # n_parents <- length(selected_parents)
-  # dummy_blup1 <- rnorm(n_parents)
-  # dummy_blup2 <- rnorm(n_parents)
-  # dummy_blups <- data.frame(
-  #   Clone = selected_parents,
-  #   Trait1 = dummy_blup1,
-  #   Trait2 = dummy_blup2
-  # )
-  # 
-  # # Create a dummy relationship matrix
-  # dummy_K <- matrix(runif(n_parents^2, 0, 1), nrow = n_parents, ncol = n_parents)
-  # rownames(dummy_K) <- colnames(dummy_K) <- selected_parents
-  # 
-  # Create custom crossing plan ensuring females and males are correctly assigned
-  cross_plan <- SimpleMating::planCross(TargetPop = female_parents, TargetPop2 = male_parents)
-  
-  # Debug print
-  print("Cross plan:")
-  print(head(cross_plan))
-  print(paste("Number of crosses:", nrow(cross_plan)))
-  
-  # Predict mid-parent average
-  mpa <- tryCatch({
-    SimpleMating::getMPA(MatePlan = cross_plan,
-                        Criterion = blup[,1:4],
-                        K = amat,
-                        Weights = weights)
-  }, error = function(e) {
-    print(paste("Error in MPA calculation:", e$message))
-    return(NULL)
-  })
-  
-  if (is.null(mpa)) {
-    return(list(crosses = data.frame(Message = "Error in MPA calculation"), plot = NULL))
-  }
-  
-  # Select crosses
-  optimized_plan <- tryCatch({
-    plan <- SimpleMating::selectCrosses(data = mpa,
-                                      n.cross = n_crosses,
-                                      max.cross = max_crosses_per_parent,
-                                      min.cross = 1,
-                                      culling.pairwise.k = culling_k)
-    
-    if (is.null(plan) || length(plan) < 2 || is.null(plan[[2]])) {
-      return(NULL)
+  tryCatch({
+    # Validate inputs
+    if (length(male_parents) == 0 || length(female_parents) == 0) {
+      stop("No parents selected")
     }
     
-    # Rename columns and round Y and K values
-    plan[[2]] <- plan[[2]] %>%
-      rename(Female.Parent = Parent1, Male.Parent = Parent2) %>%
-      mutate(across(c(Y, K), ~round(., 3)))
+    if (abs(sum(weights) - 1) > 0.01) {
+      stop("Trait weights must sum to 1")
+    }
     
-    plan
+    # Filter inventory data
+    selected_parents <- c(male_parents, female_parents)
+    filtered_inventory <- inventory_data[inventory_data$Clone %in% selected_parents, ]
     
+    if (nrow(filtered_inventory) == 0) {
+      stop("No valid inventory data for selected parents")
+    }
+    
+    # Filter BLUP data
+    blup <- blup[blup$Clone %in% selected_parents, ]
+    if (nrow(blup) == 0) {
+      stop("No BLUP data available for selected parents")
+    }
+    
+    # Filter relationship matrix
+    amat <- tryCatch({
+      as.matrix(amat[selected_parents, selected_parents])
+    }, error = function(e) {
+      stop("Error processing relationship matrix: ", e$message)
+    })
+    
+    # Create crossing plan
+    cross_plan <- SimpleMating::planCross(TargetPop = female_parents, TargetPop2 = male_parents)
+    
+    # Debug print
+    print("Cross plan:")
+    print(head(cross_plan))
+    print(paste("Number of crosses:", nrow(cross_plan)))
+    
+    # Predict mid-parent average
+    mpa <- tryCatch({
+      SimpleMating::getMPA(MatePlan = cross_plan,
+                          Criterion = blup[,1:4],
+                          K = amat,
+                          Weights = weights)
+    }, error = function(e) {
+      print(paste("Error in MPA calculation:", e$message))
+      return(NULL)
+    })
+    
+    if (is.null(mpa)) {
+      return(list(crosses = data.frame(Message = "Error in MPA calculation"), plot = NULL))
+    }
+    
+    # Select crosses
+    optimized_plan <- tryCatch({
+      plan <- SimpleMating::selectCrosses(data = mpa,
+                                        n.cross = n_crosses,
+                                        max.cross = max_crosses_per_parent,
+                                        min.cross = 1,
+                                        culling.pairwise.k = culling_k)
+      
+      if (is.null(plan) || length(plan) < 2 || is.null(plan[[2]])) {
+        return(NULL)
+      }
+      
+      # Rename columns and round Y and K values
+      plan[[2]] <- plan[[2]] %>%
+        rename(Female.Parent = Parent1, Male.Parent = Parent2) %>%
+        mutate(across(c(Y, K), ~round(., 3)))
+      
+      plan
+      
+    }, error = function(e) {
+      print(paste("Error in cross selection:", e$message))
+      return(NULL)
+    })
+    
+    if (is.null(optimized_plan)) {
+      return(list(
+        crosses = data.frame(
+          Message = "No valid crosses found. Try adjusting the culling parameter or increasing the number of parents."
+        ), 
+        plot = NULL
+      ))
+    }
+    
+    # Prepare output
+    crosses <- optimized_plan[[2]]
+    plot <- optimized_plan[[3]]
+    
+    return(list(crosses = crosses, plot = plot))
   }, error = function(e) {
-    print(paste("Error in cross selection:", e$message))
-    return(NULL)
-  })
-  
-  if (is.null(optimized_plan)) {
+    # Return informative error message
     return(list(
-      crosses = data.frame(
-        Message = "No valid crosses found. Try adjusting the culling parameter or increasing the number of parents."
-      ), 
+      crosses = data.frame(Message = paste("Error:", e$message)),
       plot = NULL
     ))
-  }
-  
-  # Prepare output
-  crosses <- optimized_plan[[2]]
-  plot <- optimized_plan[[3]]
-  
-  return(list(crosses = crosses, plot = plot))
+  }, warning = function(w) {
+    # Log warning but continue
+    warning(w$message)
+  })
 }
 
 fetch_pedigree_data <- function(clone) {
