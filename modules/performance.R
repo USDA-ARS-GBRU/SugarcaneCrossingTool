@@ -7,9 +7,9 @@ performance_server <- function(input, output, session, reactive_iid, rv, rv_trai
     germplasm<-germplasm[duplicated(germplasm$Clone)==FALSE,]
     
     #Only show sorted clones
-    display<-c(inventory_init()$male$Clone,inventory_init()$female$Clone)
-    display_male<-c(inventory_init()$male$Clone)
-    display_female<-c(inventory_init()$female$Clone)
+    display<-c(unique(input$female_list), unique(input$male_list))
+    display_male<-c(unique(input$male_list))
+    display_female<-c( unique(input$female_list))
     germplasm<-germplasm[which(germplasm$Clone%in%display),]
 
   # pull phenotype data for each item in inventory table ('germplasm')
@@ -88,7 +88,7 @@ performance_server <- function(input, output, session, reactive_iid, rv, rv_trai
   y <- reshape2::dcast(z, germplasmName ~ observations.observationVariableName)
 
   # join with Advanced data
-  s <- s %>% right_join(y) %>% rename(Clone = germplasmName)
+  s <- s %>% right_join(y) %>% dplyr::rename(Clone = germplasmName)
 
   return(s)
 }))

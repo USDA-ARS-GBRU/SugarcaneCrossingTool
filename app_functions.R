@@ -256,7 +256,7 @@ optimize_crosses <- function(inventory_data, male_parents, female_parents, n_cro
     
     # Rename columns and round Y and K values
     plan[[2]] <- plan[[2]] %>%
-      rename(Female.Parent = Parent1, Male.Parent = Parent2) %>%
+      dplyr::rename(Female.Parent = Parent1, Male.Parent = Parent2) %>%
       mutate(across(c(Y, K), ~round(., 3)))
     
     plan
@@ -277,12 +277,12 @@ optimize_crosses <- function(inventory_data, male_parents, female_parents, n_cro
   
   # Prepare output
   crosses <- optimized_plan[[2]] %>% 
-    left_join(y=blup %>% rename(Female.Parent=Clone)) %>%
-    left_join(y=blup %>% rename(Male.Parent=Clone), by="Male.Parent")
+    left_join(y=blup %>% dplyr::rename(Female.Parent=Clone)) %>%
+    left_join(y=blup %>% dplyr::rename(Male.Parent=Clone), by="Male.Parent")
  
   optimized_plan[[3]]$data<- optimized_plan[[3]]$data %>% 
-    left_join(y=blup %>% rename(Parent1=Clone)) %>%
-    left_join(y=blup %>% rename(Parent2=Clone), by="Parent2")
+    left_join(y=blup %>% dplyr::rename(Parent1=Clone)) %>%
+    left_join(y=blup %>% dplyr::rename(Parent2=Clone), by="Parent2")
   
   plot <- optimized_plan[[3]]
   

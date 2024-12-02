@@ -268,7 +268,7 @@ ui <- dashboardPage(
         p("* Start by loggin in: from the sidebar on the left, (1) select a location and (2) breeder name."),
         p("* Then, chose an (3) inventory date."),
         p("* Next, (4) Click on the 'Get Flower Inventory' button"),
-        p("* After that, move to the Flowering Inventory tab to view your inventory data"),
+        p("* After that, move to the Flowering Inventory tab to resort your inventory data"),
         p("* You can then click on other tabs to explore related breeding data"),
         p("Follow ", a(href="https://github.com/USDA-ARS-GBRU/SugarcaneCrossingTool", "this link"), " to the github repo for detailed instructions."),
        
@@ -297,28 +297,30 @@ ui <- dashboardPage(
       tabItem(
         tabName = "flowering",
 
-        
+          tabsetPanel(
+            type = "tabs",
+            tabPanel(
+              "Interactive Sorting Table",
+        #this commented out code is only useful for troubleshooting the sorting lists
+        # fluidRow(
+        #   column(
+        #     width = 12,
+        #     tags$b("Result"),
+        #     column(
+        #       width = 12,
+        # 
+        #       tags$p("input$female_list"),
+        #       verbatimTextOutput("results_1"),
+        # 
+        #       tags$p("input$male_list"),
+        #       verbatimTextOutput("results_2"),
+        # 
+        #     )
+        #   )
+        # )
+        # ,
+        #   
         fluidRow(
-          column(
-            width = 12,
-            tags$b("Result"),
-            column(
-              width = 12,
-              
-              tags$p("input$female_list"),
-              verbatimTextOutput("results_1"),
-              
-              tags$p("input$male_list"),
-              verbatimTextOutput("results_2"),
-              
-            )
-          )
-        )
-        ,
-          
-        fluidRow(
-
-
           box(
             title = "Step 5: Sorting",
             p("Drag and drop the available flowering clones into their appropriate category.", strong("Only"), "sorted clones will be displayed in subsequent tabs and/or used in cross prediction so this step must be done first."),
@@ -341,34 +343,12 @@ ui <- dashboardPage(
               )
             )
           )
-        ),
+        )),
 
-        
-        # fluidRow(
-        # 
-        #   box(
-        #     title = "Inventory",
-        #     p("These tables show the number and location of male and female clones flowering today"),
-        #     width = 12,
-        #     fluidRow(
-        #       column(
-        #         width = 4,
-        #         h4("Male Clones"),
-        #         DTOutput("inventoryTableMale")
-        #       ),
-        #       column(
-        #         width = 4,
-        #         h4("Female Clones"),
-        #         DTOutput("inventoryTableFemale")
-        #       
-        #       )
-        #     )
-        #   )
-        # ), 
-        # 
-
+        tabPanel(
+          "Raw data",
         fluidRow(
-        box(title="These tables shows you all parents flowering today, sorted into male and female columns based on techician's inventory",
+        box(title="These tables shows you the raw data for all parents flowering today, sorted into male and female columns based on techician's inventory",
              textOutput("dataSourceText"),
             width=12,
             fluidRow(
@@ -386,7 +366,7 @@ ui <- dashboardPage(
 
 
         
-         ),
+         ))),
 
       ### Pedigree tab content ----
 
@@ -752,14 +732,16 @@ output$female_parents <- renderUI({
   )
 })
 
-output$results_1 <-
-  renderPrint(
-    unique(input$female_list) # This matches the input_id of the first rank list
-  )
-output$results_2 <-
-  renderPrint(
-    unique(input$male_list) # This matches the input_id of the second rank list
-  )
+#this code is useful for troubleshooting and prints to app
+
+# output$results_1 <-
+#   renderPrint(
+#     unique(input$female_list) # This matches the input_id of the first rank list
+#   )
+# output$results_2 <-
+#   renderPrint(
+#     unique(input$male_list) # This matches the input_id of the second rank list
+#   )
 
 
 
@@ -772,13 +754,13 @@ output$results_2 <-
     inventory_data <- as.data.frame(rbind(inventory_init()$male, inventory_init()$female))
     
     # Get selected parents
-    male_parents <- as.data.frame(inventory_init()$male)$Clone
-    female_parents <- as.data.frame(inventory_init()$female)$Clone
+    male_parent_list <- c(unique(input$male_list))
+    female_parent_list <- c(unique(input$female_list))
     
     ck<-input$culling_k
     
     # Check if parents are selected
-    if (length(male_parents) == 0 || length(female_parents) == 0) {
+    if (length(male_parent_list) == 0 || length(female_parent_list) == 0) {
       showNotification("Please select both male and female parents before running optimization.", type = "error")
       return()
     }
@@ -786,8 +768,8 @@ output$results_2 <-
     # Run optimization
     optimized_crosses <- tryCatch({
       optimize_crosses(inventory_data, 
-                       male_parents=male_parents,
-                       female_parents=female_parents,
+                       male_parents=male_parent_list,
+                       female_parents=female_parent_list,
                        n_crosses = input$n_crosses,
                        #min_crosses_per_parent = 1,
                        max_crosses_per_parent = input$max_crosses_per_parent,

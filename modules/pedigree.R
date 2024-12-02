@@ -10,9 +10,9 @@ pedigree_server <- function(input, output, session, reactive_iid, selectedClone,
     #Only show sorted clones
 
 
-    display<-c(inventory_init()$male$Clone,inventory_init()$female$Clone)
-    display_male<-c(inventory_init()$male$Clone)
-    display_female<-c(inventory_init()$female$Clone)
+    display<-c(unique(input$female_list), unique(input$male_list))
+    display_male<-c(unique(input$male_list))
+    display_female<-c( unique(input$female_list))
     germplasm<-germplasm[which(germplasm$Clone%in%display),]
     
     tmp <- stripClass(
@@ -22,11 +22,8 @@ pedigree_server <- function(input, output, session, reactive_iid, selectedClone,
       classString = "ba_germplasm_details"
     )
 
-    pedigree <- tmp[tmp$data.germplasmName %in% germplasm$Clone, c("data.germplasmName", "data.germplasmDbId", "data.pedigree")] %>%
-      rename(Clone = data.germplasmName, Pedigree = data.pedigree)
-
-    pedigree <- tmp[tmp$data.germplasmName %in% germplasm$Clone, c("data.germplasmName", "data.germplasmDbId", "data.pedigree")] %>%
-      rename(Clone = data.germplasmName, Pedigree = data.pedigree)
+    pedigree <- tmp[tmp$data.germplasmName %in% germplasm$Clone, c("data.germplasmName", "data.germplasmDbId", "data.pedigree")]  %>%
+       dplyr::rename(Clone = data.germplasmName, Pedigree = data.pedigree)
 
     #note: could rewrite ba_germplam_progeny to speed performance
     
@@ -59,27 +56,25 @@ pedigree_server <- function(input, output, session, reactive_iid, selectedClone,
 
   pedmatrix_init <- eventReactive(input$makepedigree, {
     
-    germplasm <- as.data.frame(rbind(inventory_init()$male, inventory_init()$female))
-    germplasm<-germplasm[duplicated(germplasm$Clone)==FALSE,]
     
 
     mat <- PedMatrix(pedigree_download)
 
-    #get rid of this for now
+    #get rid of this for now - LA specific
     # if ("LCP85-0384" %in% germplasm$Clone) {
     #   axis <- germplasm$Clone
     # } else {
     #   axis <- c(germplasm$Clone, "LCP85-0384")
     # }
     
-    mat2 <- round(mat[inventory_init()$male$Clone,inventory_init()$female$Clone ], 2)
+    mat2 <- round(mat[unique(input$male_list), unique(input$female_list) ], 2)
     mat2 <- as.data.frame(mat2)
     mat2$Clone <- rownames(mat2)
     mat2 <- mat2[, c(dim(mat2)[2], 1:dim(mat2)[2] - 1)]
     return(mat2)
   })
 
-  #get rid of this for now
+  #get rid of this for now - LA secific
   # output$pedigreeTable <- ({
   #   renderDT(merge(pedigree_init(), pedmatrix_init()[, c("LCP85-0384", "Clone")],
   #     by = "Clone"

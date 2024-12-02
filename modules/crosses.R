@@ -10,9 +10,9 @@ crosses_init <- eventReactive(input$makecrosses, withProgress(message = "Pulling
     germplasm<-germplasm[duplicated(germplasm$Clone)==FALSE,]
 
     #Only show sorted clones
-    display<-c(inventory_init()$male$Clone,inventory_init()$female$Clone)
-    display_male<-c(inventory_init()$male$Clone)
-    display_female<-c(inventory_init()$female$Clone)
+    display<-c(unique(input$female_list), unique(input$male_list))
+    display_male<-c(unique(input$male_list))
+    display_female<-c( unique(input$female_list))
     germplasm<-germplasm[which(germplasm$Clone%in%display),]
 
     # Get historical cross table using the InitCrossTable function
@@ -55,9 +55,9 @@ recip_crosses_init <- eventReactive(input$makerecipcrosses, withProgress(message
   germplasm<-germplasm[duplicated(germplasm$Clone)==FALSE,]
   
   #Only show sorted clones
-  display<-c(inventory_init()$male$Clone,inventory_init()$female$Clone)
-  display_male<-c(inventory_init()$male$Clone)
-  display_female<-c(inventory_init()$female$Clone)
+  display<-c(unique(input$female_list), unique(input$male_list))
+  display_male<-c(unique(input$male_list))
+  display_female<-c( unique(input$female_list))
   germplasm<-germplasm[which(germplasm$Clone%in%display),]
   
   # Get historical cross table using the InitCrossTable function
