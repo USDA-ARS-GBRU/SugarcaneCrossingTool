@@ -367,22 +367,22 @@ ui <- dashboardPage(
         # ), 
         # 
 
-        # fluidRow(
-        # box(title="These tables shows you all parents flowering today, sorted into male and female columns based on techician's inventory",
-        #      textOutput("dataSourceText"),
-        #     width=12,
-        #     fluidRow(
-        #       box(column(
-        #         width=4,
-        #         DTOutput("inventoryTableMale")
-        #       )),
-        #      box(column(
-        #         width=4,
-        #         DTOutput("inventoryTableFemale")
-        #       ))
-        #     ))),
-        # 
-        # 
+        fluidRow(
+        box(title="These tables shows you all parents flowering today, sorted into male and female columns based on techician's inventory",
+             textOutput("dataSourceText"),
+            width=12,
+            fluidRow(
+              box(column(
+                width=4,
+                DTOutput("inventoryTableMale")
+              )),
+             box(column(
+                width=4,
+                DTOutput("inventoryTableFemale")
+              ))
+            ))),
+
+
 
 
         
