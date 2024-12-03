@@ -131,7 +131,7 @@ performance_server <- function(input, output, session, reactive_iid, rv, rv_trai
         # Join with Advanced data and rename columns
         s <- s %>% 
           right_join(y) %>% 
-          rename(Clone = germplasmName)
+          dplyr::rename(Clone = germplasmName)
         
         return(s)
         
@@ -221,6 +221,7 @@ performance_server <- function(input, output, session, reactive_iid, rv, rv_trai
           mode = 'markers',
           text = ~Clone,
           hoverinfo = 'text'
+        )}})})
 
   
   output$scatterPlotDropdown_x <- renderUI({

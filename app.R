@@ -361,7 +361,7 @@ ui <- dashboardPage(
                 width=4,
                 DTOutput("inventoryTableFemale")
               ))
-            ))),
+            )))
 
 
 
@@ -817,7 +817,8 @@ output$female_parents <- renderUI({
                  options = list(pageLength = 10))
       }
     })
-    
+  }
+  )    
 
     # Update plot output to use plotly for interactivity
     output$optimization_plot <- renderPlotly({
@@ -859,7 +860,7 @@ output$female_parents <- renderUI({
 
           geom_point(aes(color = Selected), size = 3, alpha = 0.7) +
           scale_color_manual(values = c("FALSE" = "gray70", "TRUE" = "#1f77b4")) +
-          geom_vline(xintercept = input$culling_k, linetype = "dashed", 
+          geom_vline(xintercept = input$culling_k, linetype = "dashed")+
 
           geom_point(aes(color = Sel), size = 3, alpha = 0.7) +
           #scale_color_manual(values = c("Non-Selected" = "gray", "Mating Plan" = "blue")) +
@@ -937,17 +938,8 @@ output$female_parents <- renderUI({
   }
 )
 
-  })
+  
 
-  # Add weight sum warning
-  output$weight_sum_warning <- renderText({
-    total_weight <- input$brix + input$biomass + input$ratoon
-    if (abs(total_weight - 1) > 0.01) {
-      return(paste("Warning: Weights sum to", round(total_weight, 2), "- should equal 1"))
-    } else {
-      return(paste("Weights sum to", round(total_weight, 2)))
-    }
-  })
 
   # Add global error handler
   options(shiny.error = function() {
@@ -971,8 +963,11 @@ output$female_parents <- renderUI({
     cat("Session ended\n")
     # Cleanup code here if needed
   })
+
 }
 
 # Run the Shiny app
 shinyApp(ui, server) 
+
+
   

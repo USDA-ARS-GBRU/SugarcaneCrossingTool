@@ -215,7 +215,7 @@ recip_crosses_init <- eventReactive(input$makecrosses, {
     Female.Parent = "data.parent2.germplasmName", Male.Parent = "data.parent1.germplasmName", new_crosses = T, germplasm=germplasm
   )
   
-            )
+            
             if(is.null(result) || ncol(result) < 2) {
               data.frame(
                 Female.Parent = character(0),
@@ -285,7 +285,7 @@ recip_crosses_init <- eventReactive(input$makecrosses, {
       showNotification("Error displaying crosses table", type = "error")
       data.frame()
     })
-  }, extensions = "FixedColumns", options = list(
+  , extensions = "FixedColumns", options = list(
       scrollX = TRUE, fixedColumns = list(leftColumns = 3)
     ))
   })
@@ -299,11 +299,11 @@ output$recipCrossesTable <- ({
     }, error = function(e) {
       showNotification("Error displaying crosses table", type = "error")
       data.frame()
-    })
   }, extensions = "FixedColumns", options = list(
     scrollX = TRUE, fixedColumns = list(leftColumns = 3)
-  ))
+  )))
 })
+
 }
 
                                

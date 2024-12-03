@@ -31,10 +31,10 @@ pedigree_server <- function(input, output, session, reactive_iid, selectedClone,
         )
 
         pedigree <- tmp[tmp$data.germplasmName %in% germplasm$Clone, c("data.germplasmName", "data.germplasmDbId", "data.pedigree")] %>%
-          rename(Clone = data.germplasmName, Pedigree = data.pedigree)
+          dplyr::rename(Clone = data.germplasmName, Pedigree = data.pedigree)
 
         pedigree <- tmp[tmp$data.germplasmName %in% germplasm$Clone, c("data.germplasmName", "data.germplasmDbId", "data.pedigree")] %>%
-          rename(Clone = data.germplasmName, Pedigree = data.pedigree)
+          dplyr::rename(Clone = data.germplasmName, Pedigree = data.pedigree)
 
         #note: could rewrite ba_germplam_progeny to speed performance
         
@@ -61,7 +61,7 @@ pedigree_server <- function(input, output, session, reactive_iid, selectedClone,
   deeppedigree_init <- eventReactive(input$selectedClone, {
     tryCatch({
       req(input$selectedClone, inventory_init())
-      germplasm <- as.data.frame(inventory_init())
+      germplasm <- as.data.frame(rbind(inventory_init()$male, inventory_init()$female))
       germplasm <- germplasm[duplicated(germplasm$Clone) == FALSE, ]
 
       tmp <- jsonlite::fromJSON(ba_germplasm_pedigree(con = brap2, germplasmDbId = as.character(germplasm[which(germplasm$Clone == input$selectedClone), 2]), rclass = "json"))$result$data

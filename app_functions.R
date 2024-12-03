@@ -12,9 +12,10 @@ PedMatrix <- function(pedigree) {
     # ped$Female_Parent<-gsub("^$","0", ped$Female_Parent) 
     # ped$Male_Parent<-gsub("^$","0", ped$Male_Parent)
     # recode unknown accessions as 0
-    ped$Accession <- gsub("unknown|Unknown|^$", "0", ped$Accession, fixed = T)
-    ped$Male_Parent <- gsub("unknown|Unknown|^$", "0", ped$Male_Parent, fixed = T)
-    ped$Female_Parent <- gsub("unknown|Unknown|^$", "0", ped$Female_Parent, fixed = T)
+    ped[grep("unknown|Unknown|^$", ped$Accession),"Accession"]<-0
+    ped[grep("unknown|Unknown|^$", ped$Male_Parent),"Male_Parent"]<-0
+    ped[grep("unknown|Unknown|^$", ped$Female_Parent),"Female_Parent"]<-0
+    
     # remove duplicate entries
     ped <- ped[!duplicated(ped$Accession), ]
     # get rid of unknown accessions in first column
@@ -188,10 +189,11 @@ createPedigreeGraph <- function(data, selected_clone_id = NULL) {
     
     return(graph)
 
-  } else {
-    return(NULL)
+  # } else {
+  #   return(NULL)
+  # }
+  } ) 
   }
-}
 
 optimize_crosses <- function(inventory_data, male_parents, female_parents, n_crosses, max_crosses_per_parent, culling_k, blup, amat, weights) {
  
@@ -353,7 +355,7 @@ optimize_crosses <- function(inventory_data, male_parents, female_parents, n_cro
   }
   
  
-}
+
 
 fetch_pedigree_data <- function(clone) {
   # This is a placeholder implementation. You should replace this with actual data fetching logic.
