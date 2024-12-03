@@ -1,11 +1,16 @@
 #Performance.R
 performance_server <- function(input, output, session, reactive_iid, rv, rv_trait_scatter, inventory_init, clone_assignments) {
+
   performance_init <- eventReactive(input$makeperformance, {
     withProgress(message = "Pulling Performance Data", {
       tryCatch({
         # Validate inputs
         req(inventory_init())
-        germplasm <- as.data.frame(inventory_init())
+        
+         # Filter the inventory data to get unique clones
+    germplasm <- as.data.frame(rbind(inventory_init()$male, inventory_init()$female))
+    germplasm<-germplasm[duplicated(germplasm$Clone)==FALSE,]
+        
         if(nrow(germplasm) == 0) {
           stop("No inventory data available")
         }
@@ -216,19 +221,8 @@ performance_server <- function(input, output, session, reactive_iid, rv, rv_trai
           mode = 'markers',
           text = ~Clone,
           hoverinfo = 'text'
-        ) %>%
-          layout(
-            title = "Trait Scatter Plot",
-            xaxis = list(title = rv_trait_scatter$xAxis),
-            yaxis = list(title = rv_trait_scatter$yAxis)
-          )
-      }
-    }, error = function(e) {
-      showNotification("Error creating scatter plot", type = "error")
-      plotly_empty()
-    })
-  })
 
+  
   output$scatterPlotDropdown_x <- renderUI({
     selectInput(
       inputId = "xAxis_scatter",
@@ -237,6 +231,7 @@ performance_server <- function(input, output, session, reactive_iid, rv, rv_trai
       selected = rv_trait_scatter$xAxis
     )
   })
+
 
   output$scatterPlotDropdown_y <- renderUI({
     selectInput(

@@ -2,12 +2,15 @@
 
 ## Pedigree and Progeny ----
 pedigree_server <- function(input, output, session, reactive_iid, selectedClone, inventory_init, clone_assignments) {
+
   pedigree_init <- eventReactive(input$makepedigree, {
     withProgress(message = "Pulling Progeny Data", {
       tryCatch({
         # Validate inputs
         req(inventory_init())
-        germplasm <- as.data.frame(inventory_init())
+           germplasm <- as.data.frame(rbind(inventory_init()$male, inventory_init()$female))
+           germplasm<-germplasm[duplicated(germplasm$Clone)==FALSE,]
+    
         if(nrow(germplasm) == 0) {
           stop("No inventory data available")
         }
@@ -74,9 +77,10 @@ pedigree_server <- function(input, output, session, reactive_iid, selectedClone,
   })
 
   pedmatrix_init <- eventReactive(input$makepedigree, {
+
     tryCatch({
       req(input$male_list, input$female_list)
-      germplasm <<- as.data.frame(inventory_init())
+      germplasm <- as.data.frame(rbind(inventory_init()$male, inventory_init()$female))
       germplasm <- germplasm[duplicated(germplasm$Clone) == FALSE, ]
 
       mat <- PedMatrix(pedigree_download)
@@ -97,9 +101,10 @@ pedigree_server <- function(input, output, session, reactive_iid, selectedClone,
       showNotification(paste("Error creating pedigree matrix:", e$message), type = "error")
       return(data.frame())
     })
+
   })
 
-  #get rid of this for now
+  #get rid of this for now - LA secific
   # output$pedigreeTable <- ({
   #   renderDT(merge(pedigree_init(), pedmatrix_init()[, c("LCP85-0384", "Clone")],
   #     by = "Clone"

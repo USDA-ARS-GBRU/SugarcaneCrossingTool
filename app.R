@@ -4,7 +4,7 @@
 
 ## LIBRARIES -----------
 # Load required libraries
-
+library(plyr)
 library(brapi)
 library(tidyverse)
 library(shiny)
@@ -26,6 +26,7 @@ library(SimpleMating)
 library(sortable)
 library(shinyjs)
 library(plotly)
+
 
 
 # Include necessary JavaScript libraries
@@ -96,13 +97,12 @@ ui <- dashboardPage(
     
     dateInput(
       "date",
-      "Step 3: Choose A Date",
-      value = "2023-10-10"
+      "Step 3: Choose A Date"
     ),
     #actionButton("brapipull", "Get Flower Inventory Data"),
     textOutput("dateWarning"), 
     
-    p("for testing, select:", strong("October 10, 2023")),
+
     
     actionButton(
       "brapipull",
@@ -269,7 +269,7 @@ ui <- dashboardPage(
         p("* Start by loggin in: from the sidebar on the left, (1) select a location and (2) breeder name."),
         p("* Then, chose an (3) inventory date."),
         p("* Next, (4) Click on the 'Get Flower Inventory' button"),
-        p("* After that, move to the Flowering Inventory tab to view your data and sort flowering clones by gender"),
+        p("* After that, move to the Flowering Inventory tab to resort your inventory data"),
         p("* You can then click on other tabs to explore related breeding data"),
         p("Follow ", a(href="https://github.com/USDA-ARS-GBRU/SugarcaneCrossingTool", "this link"), " to the github repo for detailed instructions."),
        
@@ -297,20 +297,41 @@ ui <- dashboardPage(
       ### Inventory content -----
       tabItem(
         tabName = "flowering",
-        
+
+          tabsetPanel(
+            type = "tabs",
+            tabPanel(
+              "Interactive Sorting Table",
+        #this commented out code is only useful for troubleshooting the sorting lists
+        # fluidRow(
+        #   column(
+        #     width = 12,
+        #     tags$b("Result"),
+        #     column(
+        #       width = 12,
+        # 
+        #       tags$p("input$female_list"),
+        #       verbatimTextOutput("results_1"),
+        # 
+        #       tags$p("input$male_list"),
+        #       verbatimTextOutput("results_2"),
+        # 
+        #     )
+        #   )
+        # )
+        # ,
+        #   
         fluidRow(
-       
-     
           box(
             title = "Step 5: Sorting",
             p("Drag and drop the available flowering clones into their appropriate category.", strong("Only"), "sorted clones will be displayed in subsequent tabs and/or used in cross prediction so this step must be done first."),
             width = 12,
             fluidRow(
-              column(
-                width = 4,
-                h4("Available Clones"),
-                uiOutput("available_clones")
-              ),
+              # column(
+              #   width = 4,
+              #   h4("Available Clones"),
+              #   uiOutput("available_clones")
+              # ),
               column(
                 width = 4,
                 h4("Female Parents"),
@@ -323,24 +344,30 @@ ui <- dashboardPage(
               )
             )
           )
-        ),
-     
+        )),
 
-        box(title="This table shows you the raw data for the sorting you did above.",
+        tabPanel(
+          "Raw data",
+        fluidRow(
+        box(title="These tables shows you the raw data for all parents flowering today, sorted into male and female columns based on techician's inventory",
              textOutput("dataSourceText"),
             width=12,
             fluidRow(
-              column(
-                width=4, 
-                DTOutput("inventoryTable"),
-              )
-            )),
-        
-       
+              box(column(
+                width=4,
+                DTOutput("inventoryTableMale")
+              )),
+             box(column(
+                width=4,
+                DTOutput("inventoryTableFemale")
+              ))
+            ))),
+
+
 
 
         
-         ),
+         ))),
 
       ### Pedigree tab content ----
 
@@ -429,6 +456,10 @@ ui <- dashboardPage(
       ### Crosses tab content ----
       tabItem(
         tabName = "crosses",
+        tabsetPanel(
+          type = "tabs",
+          tabPanel(
+            "Previous Crosses",
         fluidRow(
           box(
             title="Previous crosses made with selected clones",
@@ -437,12 +468,31 @@ ui <- dashboardPage(
               inputId = "makecrosses",
               label = "Get Data on Previous Crosses and Seedlots"
             ),
-            p("This table shows a count of", strong("previous"), "made with your selected clones. It also shows the total number of progeny and availablity of seedlots for these crosses. This table is filtered based on categorizatons made in step 5.
+            p("This table shows a count of", strong("previous"), "crosses made with your selected clones. It also shows the total number of progeny and availablity of seedlots for these crosses. This table is filtered based on categorizatons made in step 5.
               If the cross was made earlier this year, the 'Progeny.Per.Cross' column will read 'None yet, new cross this year'.")
           )
         ),
         DTOutput("crossesTable")
       ),
+      tabPanel(
+        "Previous Reciprocal Crosses",
+        fluidRow(
+          box(
+            title="Previous RECIPROCAL crosses made with selected clones",
+            width=12,
+            actionButton(
+              inputId = "makerecipcrosses",
+              label = "Get Data on Previous RECIPROCAL Crosses and Seedlots"
+            ),
+            p("This table shows a count of", strong("previous RECIPROCAL"), "crosses made with your selected clones. It also shows the total number of progeny and availablity of seedlots for these crosses. This table is filtered based on categorizatons made in step 5.
+              If the cross was made earlier this year, the 'Progeny.Per.Cross' column will read 'None yet, new cross this year'.")
+          )
+        ), 
+        DTOutput("recipCrossesTable")
+      )
+      )
+      )
+      ,
 
   
 
@@ -475,6 +525,7 @@ ui <- dashboardPage(
             title = "Optimization Parameters",
             numericInput("n_crosses", "Number of Crosses to Select:", 10, min = 1, max = 100),
             numericInput("max_crosses_per_parent", "Max Crosses per Parent:", 3, min = 1, max = 10),
+
             
             sliderInput("culling_k", "Culling Pairwise K:", 
                        min = 0, max = 1, value = 0.5, step = 0.05),
@@ -488,6 +539,7 @@ ui <- dashboardPage(
                        min = 0, max = 1, value = 0.34, step = 0.01),
             
             textOutput("weight_sum_warning"),
+            
             actionButton("run_optimization", "Run Optimization")
           ),
           box(
@@ -506,46 +558,46 @@ ui <- dashboardPage(
   )
 )
 
+# inventory_init <<- eventReactive(input$brapipull, withProgress(message = "Pulling Inventory Data", {
+#   tryCatch({
+#     
+#     inven <- data.frame(brapi::ba_studies_table(con = brap, studyDbId = reactive_iid(), rclass="data.frame")) %>%
+#       filter(observationLevel == "plot") %>% # select just plant rows
+#       set_names(~(.)%>% str_replace_all("SUGARCANE.*","") %>% str_replace_all("\\.","")) %>% # take CO term out of colnames
+#       mutate_at('blockNumber', as.factor)
+#     
+#     inven$blockNumber<-revalue(inven$blockNumber, c("1"="West", "2"="East", "3"="Railcarts", "4"="Back"))
+#     
+#     inven_male<-filter(inven, grepl(reactive_date(),TasselCountMale)) %>% 
+#       select(germplasmName, blockNumber, notes, TasselCountMale) %>% 
+#       separate(TasselCountMale, into=c("Count",NA), sep=",") %>%
+#       group_by(germplasmName)
+#     
+#     male<-merge(aggregate(as.numeric(Count)~germplasmName,inven_male, sum ),
+#                 aggregate(blockNumber~germplasmName,inven_male, function(x) paste(unique(x), collapse=":")))
+#     
+#     inven_female<-filter(inven, grepl(reactive_date(),TasselCountFemale)) %>% 
+#       select(germplasmName, blockNumber, notes, TasselCountFemale) %>% 
+#       separate(TasselCountFemale, into=c("Count",NA), sep=",") %>%
+#       group_by(germplasmName)
+#     
+#     female<-merge(aggregate(as.numeric(Count)~germplasmName,inven_female, sum ),
+#                   aggregate(blockNumber~germplasmName,inven_female, function(x) paste0(unique(x), collapse=":")))
+#     
+#     colnames(male)<-colnames(female)<-c("Clone", "FlowerCount", "Location")
+#     
+#     inven2<-list(male, female)
+#     names(inven2)<-c("male", "female")
+#     
+#     dataSource("Data pulled from BrAPI")
+#     inven2
+#   }, error = function(e) {
+#     dataSource("Saved data is being rendered")
+#     data.frame(Clone = character(), FloweringCount = numeric(), Location = character()) # Return an empty data frame with the expected columns
+#   })
+# }))
 
-# Define the inventory_init function as a global variable
-inventory_init <<- eventReactive(input$brapipull, {
-  withProgress(message = "Pulling Inventory Data", {
-    tryCatch({
-      inven <- data.frame(brapi::ba_studies_table(con = brap, studyDbId = reactive_iid(), rclass="data.frame")) %>%
-        filter(observationLevel == "plant") %>%
-        set_names(~(.)%>% str_replace_all("SUGARCANE.*","") %>% str_replace_all("\\.","")) %>%
-        filter(FloweringTime == reactive_date()) %>%
-        select(germplasmName, germplasmDbId, SexMFWM) %>%
-        group_by(germplasmName, germplasmDbId, SexMFWM) %>%
-        summarise(count = n()) %>%
-        rename(Clone = germplasmName, FloweringCount = count, Sex = SexMFWM)
-      
-      dataSource("Data pulled from BrAPI")
-      inven
-      
-    }, error = function(e) {
-      # Show error notification to user
-      showNotification(
-        paste("Error pulling inventory data:", e$message),
-        type = "error",
-        duration = NULL
-      )
-      # Return empty dataframe with expected structure
-      dataSource("Error occurred - using empty dataset")
-      data.frame(
-        Clone = character(),
-        FloweringCount = numeric(),
-        Sex = character(),
-        stringsAsFactors = FALSE
-      )
-    }, warning = function(w) {
-      showNotification(
-        paste("Warning:", w$message),
-        type = "warning"
-      )
-    })
-  })
-})
+
 
 # SERVER ---------------------------------------
 
@@ -616,6 +668,7 @@ server <- function(input, output, session) {
   # Add reactiveValues for sharing data between modules
   rv <- reactiveValues(
     previous_crosses = NULL,
+    recip_previous_crosses=NULL,
     selectedColumns = NULL
   )
   
@@ -657,76 +710,62 @@ server <- function(input, output, session) {
     
   })
     
- # Reactive value to store the current state of clone assignments
-  clone_assignments <- reactiveVal(list(available = character(), male = character(), female = character()))
-  
-  # Initialize available clones
-  observe({
-    inventory_data <- inventory_init()
-    clones <- unique(inventory_data$Clone)
-    clone_assignments(list(available = clones, male = character(), female = character()))
-  })
-  
-  # Render sortable lists
-  output$available_clones <- renderUI({
-    bucket_list(
-      header = "Available Clones",
-      group_name = "clone_buckets",
+
+#### Sorting section for inventory
+
+
+output$male_parents <- renderUI({
+
+    rank_list(
+      text = "Drag male parents here",
+      labels = inventory_init()$male$Clone,
+      input_id = "male_list",
+      options=sortable_options(group="clone_buckets"),
       orientation = "vertical",
-      add_rank_list(
-        text = "Drag clones from here",
-        labels = clone_assignments()$available,
-        input_id = "available_list"
-      )
     )
-  })
-  
-  output$male_parents <- renderUI({
-    bucket_list(
-      header = "Male Parents",
-      group_name = "clone_buckets",
+})
+
+output$female_parents <- renderUI({
+    rank_list(
+      text = "Drag female parents here",
+      labels = inventory_init()$female$Clone,
+      input_id = "female_list",
+      options=sortable_options(group="clone_buckets"),
       orientation = "vertical",
-      add_rank_list(
-        text = "Drag male parents here",
-        labels = clone_assignments()$male,
-        input_id = "male_list"
-      )
-    )
-  })
-  
-  output$female_parents <- renderUI({
-    bucket_list(
-      header = "Female Parents",
-      group_name = "clone_buckets",
-      orientation = "vertical",
-      add_rank_list(
-        text = "Drag female parents here",
-        labels = clone_assignments()$female,
-        input_id = "female_list"
-      )
-    )
-  })
-  
-  # Update clone assignments when lists change
-  observe({
-    clone_assignments(list(
-      available = input$available_list,
-      male = input$male_list,
-      female = input$female_list
-    ))
-  })
-  
+      
+
+  )
+})
+
+#this code is useful for troubleshooting and prints to app
+
+# output$results_1 <-
+#   renderPrint(
+#     unique(input$female_list) # This matches the input_id of the first rank list
+#   )
+# output$results_2 <-
+#   renderPrint(
+#     unique(input$male_list) # This matches the input_id of the second rank list
+#   )
+
+
+
+
+
   # Cross Optimization
   observeEvent(input$run_optimization, {
     # Get current inventory data
-    inventory_data <- inventory_init()
+    #inventory_data <- inventory_init()
+    inventory_data <- as.data.frame(rbind(inventory_init()$male, inventory_init()$female))
     
     # Get selected parents
-    male_parents <- clone_assignments()$male
-    female_parents <- clone_assignments()$female
+    male_parent_list <- c(unique(input$male_list))
+    female_parent_list <- c(unique(input$female_list))
+    
+    ck<-input$culling_k
     
     # Check if parents are selected
-    if (length(male_parents) == 0 || length(female_parents) == 0) {
+    if (length(male_parent_list) == 0 || length(female_parent_list) == 0) {
       showNotification("Please select both male and female parents before running optimization.", type = "error")
       return()
     }
@@ -734,14 +773,17 @@ server <- function(input, output, session) {
     # Run optimization
     optimized_crosses <- tryCatch({
       optimize_crosses(inventory_data, 
-                       male_parents,
-                       female_parents,
+                       male_parents=male_parent_list,
+                       female_parents=female_parent_list,
                        n_crosses = input$n_crosses,
                        #min_crosses_per_parent = 1,
                        max_crosses_per_parent = input$max_crosses_per_parent,
                        # min_crosses_per_parent = input$min_crosses_per_parent,
                        culling_k = input$culling_k,
-                       prop_sel = input$prop_sel,
+
+
+                       #prop_sel = input$prop_sel,
+
                        blup=blup_data[,1:4],
                        amat=as.matrix(parent_amat),
                        weights=c(input$brix, input$biomass, input$ratoon))
@@ -767,7 +809,7 @@ server <- function(input, output, session) {
         datatable(optimized_crosses$crosses, 
                  options = list(
                    scrollX = TRUE,
-                   fixedColumns = list(leftColumns = 2),
+                   fixedColumns = list(leftColumns = 3),
                    pageLength = 10
                  ))
       } else {
@@ -776,19 +818,24 @@ server <- function(input, output, session) {
       }
     })
     
+
     # Update plot output to use plotly for interactivity
     output$optimization_plot <- renderPlotly({
+
       if (!is.null(optimized_crosses$plot)) {
         # Extract plot data and ensure it has all required columns
         plot_data <- optimized_crosses$plot$data
         
         # Add rank column and selected status
-        plot_data$Rank <- 1:nrow(plot_data)
-        plot_data$Selected <- plot_data$Rank <= input$n_crosses
+
+        #plot_data$Rank <- 1:nrow(plot_data)
+        #plot_data$Selected <- plot_data$Rank <= input$n_crosses
         
         # Create hover text based on available columns
+       
         hover_text <- paste(
-          "Rank:", plot_data$Rank,
+          #"Rank:", plot_data$Rank,
+
           "\nParent1:", plot_data$Parent1,
           "\nParent2:", plot_data$Parent2,
           "\nSelection Index:", round(plot_data$Y, 3),
@@ -796,6 +843,7 @@ server <- function(input, output, session) {
         )
         
         # Add additional information if available
+
         if ("Seed.Quantity" %in% names(plot_data)) {
           hover_text <- paste(hover_text, 
                             "\nSeed Quantity:", plot_data$Seed.Quantity)
@@ -808,9 +856,15 @@ server <- function(input, output, session) {
         # Create new ggplot with hover text and vertical line
         p <- ggplot(plot_data, aes(x = K, y = Y)) +
           # Color points based on selection status
+
           geom_point(aes(color = Selected), size = 3, alpha = 0.7) +
           scale_color_manual(values = c("FALSE" = "gray70", "TRUE" = "#1f77b4")) +
           geom_vline(xintercept = input$culling_k, linetype = "dashed", 
+
+          geom_point(aes(color = Sel), size = 3, alpha = 0.7) +
+          #scale_color_manual(values = c("Non-Selected" = "gray", "Mating Plan" = "blue")) +
+          geom_vline(xintercept = ck, linetype = "dashed", 
+
                     color = "red", size = 1) +
           theme_minimal() +
           theme(
@@ -846,6 +900,26 @@ server <- function(input, output, session) {
           )
       }
     })
+     
+  
+     # Add weight sum warning
+     output$weight_sum_warning <- renderText({
+       total_weight <- input$brix + input$biomass + input$ratoon
+       if (abs(total_weight - 1) > 0.01) {
+         return(paste("Warning: Weights sum to", round(total_weight, 2), "- should equal 1"))
+       } else {
+         return(paste("Weights sum to", round(total_weight, 2)))
+       }
+     })
+  
+    # output$optimization_plot <- renderPlot({
+    #   if (!is.null(optimized_crosses$plot)) {
+    #     optimized_crosses$plot
+    #   } else {
+    #     plot(0, 0, type = "n", axes = FALSE, xlab = "", ylab = "")
+    #     text(0, 0, "No plot available", cex = 1.5)
+    #   }
+    # })
 
     output$download_optimized_plan <- downloadHandler(
   filename = function() {
