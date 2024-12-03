@@ -604,6 +604,9 @@ ui <- dashboardPage(
 server <- function(input, output, session) {
   library(networkD3)
   
+  # Initialize optimized_crosses in the global scope
+  optimized_crosses <- reactiveVal(list(crosses = data.frame(), plot = NULL))
+  
   # Reactive value for selected date
   reactive_date <- reactive({
     input$date
@@ -755,14 +758,13 @@ output$female_parents <- renderUI({
   # Cross Optimization
   observeEvent(input$run_optimization, {
     # Get current inventory data
-    #inventory_data <- inventory_init()
     inventory_data <- as.data.frame(rbind(inventory_init()$male, inventory_init()$female))
     
     # Get selected parents
     male_parent_list <- c(unique(input$male_list))
     female_parent_list <- c(unique(input$female_list))
     
-    ck<-input$culling_k
+    ck <- input$culling_k
     
     # Check if parents are selected
     if (length(male_parent_list) == 0 || length(female_parent_list) == 0) {
@@ -771,176 +773,133 @@ output$female_parents <- renderUI({
     }
     
     # Run optimization
-    optimized_crosses <- tryCatch({
+    result <- tryCatch({
       optimize_crosses(inventory_data, 
-                       male_parents=male_parent_list,
-                       female_parents=female_parent_list,
+                       male_parents = male_parent_list,
+                       female_parents = female_parent_list,
                        n_crosses = input$n_crosses,
-                       #min_crosses_per_parent = 1,
                        max_crosses_per_parent = input$max_crosses_per_parent,
-                       # min_crosses_per_parent = input$min_crosses_per_parent,
                        culling_k = input$culling_k,
-
-
-                       #prop_sel = input$prop_sel,
-
-                       blup=blup_data[,1:4],
-                       amat=as.matrix(parent_amat),
-                       weights=c(input$brix, input$biomass, input$ratoon))
+                       blup = blup_data[,1:4],
+                       amat = as.matrix(parent_amat),
+                       weights = c(input$brix, input$biomass, input$ratoon))
     }, error = function(e) {
       showNotification(paste("Error in optimization:", e$message), type = "error")
       return(list(crosses = data.frame(), plot = NULL))
     })
     
+    # Update the reactive value
+    optimized_crosses(result)
+    
     # Display results
     output$optimized_crosses_table <- renderDT({
-      if (!is.null(optimized_crosses$crosses) && nrow(optimized_crosses$crosses) > 0) {
+      crosses <- optimized_crosses()$crosses
+      if (!is.null(crosses) && nrow(crosses) > 0) {
         # Join with previous crosses if available
         if (!is.null(rv$previous_crosses)) {
-          optimized_crosses$crosses <- optimized_crosses$crosses %>%
+          crosses <- crosses %>%
             left_join(rv$previous_crosses, 
-                     by = c("Female.Parent", "Male.Parent"))
+                      by = c("Female.Parent", "Male.Parent"))
         }
         
         # Add rank column
-        optimized_crosses$crosses <- optimized_crosses$crosses %>%
+        crosses <- crosses %>%
           mutate(Rank = row_number())
         
-        datatable(optimized_crosses$crosses, 
-                 options = list(
-                   scrollX = TRUE,
-                   fixedColumns = list(leftColumns = 3),
-                   pageLength = 10
-                 ))
+        datatable(crosses, 
+                  options = list(
+                    scrollX = TRUE,
+                    fixedColumns = list(leftColumns = 3),
+                    pageLength = 10
+                  ))
       } else {
         datatable(data.frame(Message = "No crosses found or error occurred"), 
-                 options = list(pageLength = 10))
+                  options = list(pageLength = 10))
       }
     })
-  }
-  )    
-
-    # Update plot output to use plotly for interactivity
-    output$optimization_plot <- renderPlotly({
-
-      if (!is.null(optimized_crosses$plot)) {
-        # Extract plot data and ensure it has all required columns
-        plot_data <- optimized_crosses$plot$data
-        
-        # Add rank column and selected status
-
-        #plot_data$Rank <- 1:nrow(plot_data)
-        #plot_data$Selected <- plot_data$Rank <= input$n_crosses
-        
-        # Create hover text based on available columns
-       
-        hover_text <- paste(
-          #"Rank:", plot_data$Rank,
-
-          "\nParent1:", plot_data$Parent1,
-          "\nParent2:", plot_data$Parent2,
-          "\nSelection Index:", round(plot_data$Y, 3),
-          "\nKinship:", round(plot_data$K, 3)
+  })
+  
+  # Update plot output to use plotly for interactivity
+  output$optimization_plot <- renderPlotly({
+    plot <- optimized_crosses()$plot
+    if (!is.null(plot)) {
+      # Extract plot data and ensure it has all required columns
+      plot_data <- plot$data
+      
+      # Add Selected column if it doesn't exist
+      if (!"Selected" %in% names(plot_data)) {
+        # Determine which points are selected based on ranking
+        n_selected <- input$n_crosses
+        plot_data$Selected <- FALSE
+        plot_data$Selected[1:min(n_selected, nrow(plot_data))] <- TRUE
+      }
+      
+      # Add hover text
+      hover_text <- paste(
+        "\nParent1:", plot_data$Parent1,
+        "\nParent2:", plot_data$Parent2,
+        "\nSelection Index:", round(plot_data$Y, 3),
+        "\nKinship:", round(plot_data$K, 3)
+      )
+      
+      # Create new ggplot with hover text and vertical line
+      p <- ggplot(plot_data, aes(x = K, y = Y)) +
+        geom_point(aes(color = Selected), size = 3, alpha = 0.7) +
+        scale_color_manual(values = c("FALSE" = "gray70", "TRUE" = "#1f77b4")) +
+        geom_vline(xintercept = input$culling_k, linetype = "dashed") +
+        theme_minimal() +
+        labs(
+          x = "Kinship Coefficient",
+          y = "Selection Index",
+          title = paste("Cross Optimization Plot (Top", input$n_crosses, "Crosses Highlighted)"),
+          color = "Selected Crosses"
+        ) +
+        aes(text = hover_text)
+      
+      ggplotly(p, tooltip = "text") %>%
+        layout(
+          hoverlabel = list(bgcolor = "white"),
+          plot_bgcolor = "white",
+          paper_bgcolor = "white"
         )
-        
-        # Add additional information if available
-
-        if ("Seed.Quantity" %in% names(plot_data)) {
-          hover_text <- paste(hover_text, 
-                            "\nSeed Quantity:", plot_data$Seed.Quantity)
-        }
-        if ("Number.of.Crosses" %in% names(plot_data)) {
-          hover_text <- paste(hover_text, 
-                            "\nPrevious Crosses:", plot_data$Number.of.Crosses)
-        }
-        
-        # Create new ggplot with hover text and vertical line
-        p <- ggplot(plot_data, aes(x = K, y = Y)) +
-          # Color points based on selection status
-
-          geom_point(aes(color = Selected), size = 3, alpha = 0.7) +
-          scale_color_manual(values = c("FALSE" = "gray70", "TRUE" = "#1f77b4")) +
-          geom_vline(xintercept = input$culling_k, linetype = "dashed")+
-
-          geom_point(aes(color = Sel), size = 3, alpha = 0.7) +
-          #scale_color_manual(values = c("Non-Selected" = "gray", "Mating Plan" = "blue")) +
-          geom_vline(xintercept = ck, linetype = "dashed", 
-
-                    color = "red", size = 1) +
-          theme_minimal() +
-          theme(
-            panel.grid.major = element_line(color = "gray90"),
-            panel.grid.minor = element_line(color = "gray95"),
-            axis.text = element_text(color = "gray30"),
-            axis.title = element_text(color = "gray30", size = 12),
-            plot.background = element_rect(fill = "white", color = NA),
-            panel.background = element_rect(fill = "white", color = NA),
-            legend.position = "top"
-          ) +
-          labs(
-            x = "Kinship Coefficient",
-            y = "Selection Index",
-            title = paste("Cross Optimization Plot (Top", input$n_crosses, "Crosses Highlighted)"),
-            color = "Selected Crosses"
-          ) +
-          aes(text = hover_text)
-        
-        ggplotly(p, tooltip = "text") %>%
-          layout(
-            hoverlabel = list(bgcolor = "white"),
-            plot_bgcolor = "white",
-            paper_bgcolor = "white"
-          )
-      } else {
-        plot_ly() %>%
-          add_annotations(
-            text = "No plot available",
-            x = 0.5,
-            y = 0.5,
-            showarrow = FALSE
-          )
-      }
-    })
-     
-  
-     # Add weight sum warning
-     output$weight_sum_warning <- renderText({
-       total_weight <- input$brix + input$biomass + input$ratoon
-       if (abs(total_weight - 1) > 0.01) {
-         return(paste("Warning: Weights sum to", round(total_weight, 2), "- should equal 1"))
-       } else {
-         return(paste("Weights sum to", round(total_weight, 2)))
-       }
-     })
-  
-    # output$optimization_plot <- renderPlot({
-    #   if (!is.null(optimized_crosses$plot)) {
-    #     optimized_crosses$plot
-    #   } else {
-    #     plot(0, 0, type = "n", axes = FALSE, xlab = "", ylab = "")
-    #     text(0, 0, "No plot available", cex = 1.5)
-    #   }
-    # })
-
-    output$download_optimized_plan <- downloadHandler(
-  filename = function() {
-    paste("optimized_crossing_plan_", Sys.Date(), ".xlsx", sep = "")
-  },
-  content = function(file) {
-    # Check if optimized crosses exist
-    if (!is.null(optimized_crosses$crosses) && nrow(optimized_crosses$crosses) > 0) {
-      writexl::write_xlsx(optimized_crosses$crosses, path = file)
     } else {
-      # If no optimized crosses, create a dummy dataframe with a message
-      dummy_data <- data.frame(Message = "No optimized crosses available. Please run the optimization first.")
-      writexl::write_xlsx(dummy_data, path = file)
+      plot_ly() %>%
+        add_annotations(
+          text = "No plot available",
+          x = 0.5,
+          y = 0.5,
+          showarrow = FALSE
+        )
     }
-  }
-)
-
+  })
   
-
-
+  # Add weight sum warning
+  output$weight_sum_warning <- renderText({
+    total_weight <- input$brix + input$biomass + input$ratoon
+    if (abs(total_weight - 1) > 0.01) {
+      return(paste("Warning: Weights sum to", round(total_weight, 2), "- should equal 1"))
+    } else {
+      return(paste("Weights sum to", round(total_weight, 2)))
+    }
+  })
+  
+  output$download_optimized_plan <- downloadHandler(
+    filename = function() {
+      paste("optimized_crossing_plan_", Sys.Date(), ".xlsx", sep = "")
+    },
+    content = function(file) {
+      # Check if optimized crosses exist
+      crosses <- optimized_crosses()$crosses
+      if (!is.null(crosses) && nrow(crosses) > 0) {
+        writexl::write_xlsx(crosses, path = file)
+      } else {
+        # If no optimized crosses, create a dummy dataframe with a message
+        dummy_data <- data.frame(Message = "No optimized crosses available. Please run the optimization first.")
+        writexl::write_xlsx(dummy_data, path = file)
+      }
+    }
+  )
+  
   # Add global error handler
   options(shiny.error = function() {
     # Log the error
