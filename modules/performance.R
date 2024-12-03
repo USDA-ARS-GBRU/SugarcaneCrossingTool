@@ -221,8 +221,13 @@ performance_server <- function(input, output, session, reactive_iid, rv, rv_trai
           mode = 'markers',
           text = ~Clone,
           hoverinfo = 'text'
+        )
+      }
+    }, error = function(e) {
+      showNotification("Error creating scatter plot", type = "error")
+    })
+  })
 
-  
   output$scatterPlotDropdown_x <- renderUI({
     selectInput(
       inputId = "xAxis_scatter",
@@ -232,7 +237,6 @@ performance_server <- function(input, output, session, reactive_iid, rv, rv_trai
     )
   })
 
-
   output$scatterPlotDropdown_y <- renderUI({
     selectInput(
       inputId = "yAxis_scatter",
@@ -240,5 +244,70 @@ performance_server <- function(input, output, session, reactive_iid, rv, rv_trai
       choices = colnames(performance_init()),
       selected = rv_trait_scatter$yAxis
     )
+  })
+
+  # Update plot output to use plotly for interactivity
+  output$optimization_plot <- renderPlotly({
+    if (!is.null(optimized_crosses$plot)) {
+      # Extract plot data and ensure it has all required columns
+      plot_data <- optimized_crosses$plot$data
+      
+      # Create hover text based on available columns
+      hover_text <- paste(
+        "\nParent1:", plot_data$Parent1,
+        "\nParent2:", plot_data$Parent2,
+        "\nSelection Index:", round(plot_data$Y, 3),
+        "\nKinship:", round(plot_data$K, 3)
+      )
+      
+      # Add additional information if available
+      if ("Seed.Quantity" %in% names(plot_data)) {
+        hover_text <- paste(hover_text, 
+                          "\nSeed Quantity:", plot_data$Seed.Quantity)
+      }
+      if ("Number.of.Crosses" %in% names(plot_data)) {
+        hover_text <- paste(hover_text, 
+                          "\nPrevious Crosses:", plot_data$Number.of.Crosses)
+      }
+      
+      # Create new ggplot with hover text and vertical line
+      p <- ggplot(plot_data, aes(x = K, y = Y)) +
+        geom_point(aes(color = Selected), size = 3, alpha = 0.7) +
+        scale_color_manual(values = c("FALSE" = "gray70", "TRUE" = "#1f77b4")) +
+        geom_vline(xintercept = input$culling_k, linetype = "dashed", 
+                  color = "red", size = 1) +
+        theme_minimal() +
+        theme(
+          panel.grid.major = element_line(color = "gray90"),
+          panel.grid.minor = element_line(color = "gray95"),
+          axis.text = element_text(color = "gray30"),
+          axis.title = element_text(color = "gray30", size = 12),
+          plot.background = element_rect(fill = "white", color = NA),
+          panel.background = element_rect(fill = "white", color = NA),
+          legend.position = "top"
+        ) +
+        labs(
+          x = "Kinship Coefficient",
+          y = "Selection Index",
+          title = paste("Cross Optimization Plot (Top", input$n_crosses, "Crosses Highlighted)"),
+          color = "Selected Crosses"
+        ) +
+        aes(text = hover_text)
+      
+      ggplotly(p, tooltip = "text") %>%
+        layout(
+          hoverlabel = list(bgcolor = "white"),
+          plot_bgcolor = "white",
+          paper_bgcolor = "white"
+        )
+    } else {
+      plot_ly() %>%
+        add_annotations(
+          text = "No plot available",
+          x = 0.5,
+          y = 0.5,
+          showarrow = FALSE
+        )
+    }
   })
 }

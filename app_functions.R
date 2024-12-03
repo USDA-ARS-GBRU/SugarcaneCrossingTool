@@ -188,10 +188,12 @@ createPedigreeGraph <- function(data, selected_clone_id = NULL) {
     
     return(graph)
 
-  } else {
+  }, error = function(e) {
+    warning("Error creating pedigree graph:", e$message)
     return(NULL)
-  }
+  })
 }
+
 
 optimize_crosses <- function(inventory_data, male_parents, female_parents, n_crosses, max_crosses_per_parent, culling_k, blup, amat, weights) {
  
