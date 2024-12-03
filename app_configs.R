@@ -52,4 +52,3 @@ brap2 <- brapi::as.ba_db(
   version = "v2"
 )
 
-

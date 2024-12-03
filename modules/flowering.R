@@ -3,7 +3,9 @@
 flowering_server <- function(input, output, session, reactive_date, reactive_iid, dataSource) {
   inventory_init <<- eventReactive(input$brapipull, withProgress(message = "Pulling Inventory Data", {
     tryCatch({
-      
+        # Validate inputs
+        req(reactive_date(), reactive_iid())
+     
       inven <- data.frame(brapi::ba_studies_table(con = brap, studyDbId = reactive_iid(), rclass="data.frame")) %>%
         filter(observationLevel == "plot") %>% # select just plant rows
         set_names(~(.)%>% str_replace_all("SUGARCANE.*","") %>% str_replace_all("\\.","")) %>% # take CO term out of colnames
@@ -42,6 +44,7 @@ flowering_server <- function(input, output, session, reactive_date, reactive_iid
   
   
   output$inventoryTableMale <- ({
+    req(inventory_init())
     renderDT(inventory_init()$male %>% select(!germplasmDbId), options = list(language = list(
       zeroRecords = "There are no records to display. Double check the date you selected and try again. 
       You may need to wait a few minutes if inventory records were recently uploaded"
@@ -49,12 +52,13 @@ flowering_server <- function(input, output, session, reactive_date, reactive_iid
   })
   
   output$inventoryTableFemale <- ({
+    req(inventory_init())
     renderDT(inventory_init()$female%>% select(!germplasmDbId), options = list(language = list(
       zeroRecords = "There are no records to display. Double check the date you selected and try again. 
       You may need to wait a few minutes if inventory records were recently uploaded"
     )))
   })
+
   
-  # Export the inventory_init function
   return(inventory_init)
 }

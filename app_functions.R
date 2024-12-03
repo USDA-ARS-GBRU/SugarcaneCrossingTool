@@ -1,105 +1,106 @@
 # create pedigree matrix
 PedMatrix <- function(pedigree) {
- 
-  ped <- pedigree[, 1:3]
-  ped[grep("unknown|Unknown|^$", ped$Accession),"Accession"]<-0
-  ped[grep("unknown|Unknown|^$", ped$Male_Parent),"Male_Parent"]<-0
-  ped[grep("unknown|Unknown|^$", ped$Female_Parent),"Female_Parent"]<-0
-  
-  
-  ## subset data (take just first three columns)
-  ped<-ped[,1:3]
-  
-  
-  #remove duplicate entries
-  ped<-ped[!duplicated(ped$Accession),]
-  
-  #get rid of unknown accessions in first column
-  ped<-ped[-which(ped$Accession==0),]
-  
-  #convert characters to factors
-  str(ped)
-  
-  colnames(ped)<-c("Clone", "Female.Parent", "Male.Parent")
-  ped<-as.data.frame(map_if(ped, is.character, as.factor))
-  
-  relmat<-as.matrix(Amatrix(ped, ploidy=10))
-  
 
-  return(relmat)
+  tryCatch({
+    if (is.null(pedigree) || nrow(pedigree) == 0) {
+      return(matrix(nrow = 0, ncol = 0))
+    }
+    ped <- pedigree[, 1:3]
+    ## clean data
+    # recode NAs and blank cells as 0
+    ped[is.na(ped)] <- "0"
+    # ped$Female_Parent<-gsub("^$","0", ped$Female_Parent) 
+    # ped$Male_Parent<-gsub("^$","0", ped$Male_Parent)
+    # recode unknown accessions as 0
+    ped$Accession <- gsub("unknown|Unknown|^$", "0", ped$Accession, fixed = T)
+    ped$Male_Parent <- gsub("unknown|Unknown|^$", "0", ped$Male_Parent, fixed = T)
+    ped$Female_Parent <- gsub("unknown|Unknown|^$", "0", ped$Female_Parent, fixed = T)
+    # remove duplicate entries
+    ped <- ped[!duplicated(ped$Accession), ]
+    # get rid of unknown accessions in first column
+    ped <- ped[-which(ped$Accession == 0), ]
+    # convert characters to factors
+    str(ped)
+    ped <- as.data.frame(map_if(ped, is.character, as.factor))
+    # calculate rel matrix
+    relmat <- as.matrix(Amatrix(ped, ploidy = 10))
+    return(relmat)
+  }, error = function(e) {
+    warning("Error creating pedigree matrix:", e$message)
+    return(matrix(nrow = 0, ncol = 0))
+  })
+
 }
 
 InitCrossTable <- function(cross_list, Cross.Name="Cross.Unique.ID", Female.Parent = "Female.Parent", Male.Parent = "Male.Parent", new_crosses = F, germplasm) {
-  
-  
-  if (dim(cross_list)[2] == 1) {
-    # if cross list is empty (first day)
-    return(NULL)
-  }
-  
-  #filter first! goes faster
-  cross_list2<-cross_list[which(cross_list$Female.Parent %in% germplasm$Clone & cross_list$Male.Parent %in% germplasm$Clone), ]
-  
- 
-  
-  if(dim(cross_list2)[1]==0){
-    return(NULL)
-  }
-  
-  if (new_crosses==F) {
-
-  ### get seedlot information
+  tryCatch({
+    # Input validation
+    if(is.null(cross_list) || !is.data.frame(cross_list)) {
+      warning("cross_list is NULL or not a data frame")
+      return(data.frame())
+    }
     
-  seeds<-brapi::ba_seedlots_details(con=brap2, 
-                               crossName=gsub("^crossName=|&$", "", 
-                                              paste(paste0("crossName=",
-                                                           cross_list2$Cross.Unique.ID, "&"),
-                                                    collapse="")), 
-                               rclass="data.frame")
- 
-  seeds$data.amount<-round(as.numeric(as.character(seeds$data.amount)),0)
-  
-  seeds$Cross.Unique.ID<-gsub("SL-", "", seeds$data.seedLotName)
-   
-  #join with subset cross list
-  cross_list2<-cross_list2 %>% left_join(seeds, by="Cross.Unique.ID")
-  
-  #aggregate
-  cross_table<-as.data.frame(aggregate(Cross.Unique.ID ~ Female.Parent + Male.Parent, FUN = c, data = cross_list2)) %>% 
-    left_join(as.data.frame(aggregate(Number.of.Progenies ~ Female.Parent + Male.Parent, FUN = sum, data = cross_list2))) %>% 
-    left_join(  as.data.frame(aggregate(data.amount ~ Female.Parent + Male.Parent, FUN = sum, data = cross_list2)))
-  
-  #cross_table$total.crosses<-apply(cross_table, 1, function(x) {length(x$Cross.Unique.ID)}) #this breaks if all entries have less than 2 crosses
-  
-  #cleanup
-  colnames(cross_table)<-c("Female.Parent", "Male.Parent", "Previous.Cross.Names", "Total.Number.of.Progenies", "Seed.Quantity.grams")    
-  
-  #colnames(cross_table)<-c("Female.Parent", "Male.Parent", "Total.Number.of.Progenies", "Seed.Quantity.grams", "Number.of.Crosses", "Cross.Names")    
-  
-  #cross_table<-cross_table[,c(1:2, 3:6)]
-  #cross_table<-cross_table[,c(1:2, 3:5)]
-  
-  return(cross_table)
 
-  } else {
-
-    # #using current crosses from this year
-    cross_table<-as.data.frame(aggregate(data.crossName~ data.parent1.germplasmName + data.parent2.germplasmName, FUN = c, data = cross_list))
-    colnames(cross_table)<-c("Female.Parent", "Male.Parent", "Cross.Names")
-    #cross_table$Number.of.Crosses<-apply(cross_table, 1, function(x) {length(x$Cross.Names)}) #this breaks if all entries have less than 2 crosses
-    cross_table<-cross_table %>% mutate(Seed.Quantity.grams="none yet - cross made this year", Total.Number.of.Progenies="none yet- cross made this year")
-
-    #cross_table<-cross_table[,c(1:2, 4:6, 3)]
-    #cleanup
-    colnames(cross_table)<-c("Female.Parent", "Male.Parent", "Previous.Cross.Names", "Total.Number.of.Progenies", "Seed.Quantity.grams")    
+    if(ncol(cross_list) < 2) {
+      warning("cross_list has insufficient columns")
+      return(data.frame())
+    }
     
-    return(cross_table)
-  }
+    #filter first! goes faster
+    cross_list2 <- cross_list[which(cross_list[[Female.Parent]] %in% germplasm$Clone & 
+                                   cross_list[[Male.Parent]] %in% germplasm$Clone), ]
+    
+    if(nrow(cross_list2) == 0) {
+      warning("No matching crosses found after filtering")
+      return(data.frame())
+    }
+    
+    if(new_crosses == FALSE) {
+      ### get seedlot information
+      tryCatch({
+        cross_names <- gsub("^crossName=|&$", "", 
+                           paste(paste0("crossName=",
+                                      cross_list2[[Cross.Name]], "&"),
+                                 collapse=""))
+        
+        seeds <- brapi::ba_seedlots_details(
+          con = brap2, 
+          crossName = cross_names, 
+          rclass = "data.frame"
+        )
+        
+        if(!is.data.frame(seeds) || nrow(seeds) == 0) {
+          warning("No seedlot data returned")
+          return(data.frame())
+        }
+        
+        seeds$data.amount <- as.numeric(as.character(seeds$data.amount))
+        seeds[[Cross.Name]] <- gsub("SL-", "", seeds$data.seedLotName)
+        
+        #join with subset cross list
+        cross_list2 <- cross_list2 %>% 
+          left_join(seeds, by = Cross.Name)
+        
+      }, error = function(e) {
+        warning(paste("Error getting seedlot details:", e$message))
+        return(data.frame())
+      })
+    }
+    
+    return(cross_list2)
+    
+  }, error = function(e) {
+    warning(paste("Error in InitCrossTable:", e$message))
+    return(data.frame())
+  })
+
 }
 
-
 createPedigreeGraph <- function(data, selected_clone_id = NULL) {
-  if (!is.null(data) && nrow(data) > 0) {
+  tryCatch({
+    if (is.null(data) || nrow(data) == 0) {
+      return(NULL)
+    }
     # Create a data frame for nodes
     nodes <- data.frame(
       id = data$germplasmDbId,
@@ -186,6 +187,7 @@ createPedigreeGraph <- function(data, selected_clone_id = NULL) {
       visOptions(highlightNearest = list(enabled = TRUE, degree = 1))
     
     return(graph)
+
   } else {
     return(NULL)
   }
@@ -233,60 +235,124 @@ optimize_crosses <- function(inventory_data, male_parents, female_parents, n_cro
                         Criterion = blup[,1:4],
                         K = amat,
                         Weights = weights)
+
   }, error = function(e) {
-    print(paste("Error in MPA calculation:", e$message))
+    warning("Error creating pedigree graph:", e$message)
     return(NULL)
   })
-  
-  if (is.null(mpa)) {
-    return(list(crosses = data.frame(Message = "Error in MPA calculation"), plot = NULL))
-  }
-  
-  # Select crosses
-  optimized_plan <- tryCatch({
-    plan <- SimpleMating::selectCrosses(data = mpa,
-                                      n.cross = n_crosses,
-                                      max.cross = max_crosses_per_parent,
-                                      min.cross = 1,
-                                      culling.pairwise.k = culling_k)
-    
-    if (is.null(plan) || length(plan) < 2 || is.null(plan[[2]])) {
-      return(NULL)
+
+}
+
+optimize_crosses <- function(inventory_data, male_parents, female_parents, n_crosses, max_crosses_per_parent, culling_k, prop_sel, blup, amat, weights) {
+  tryCatch({
+    # Validate inputs
+    if (length(male_parents) == 0 || length(female_parents) == 0) {
+      stop("No parents selected")
     }
     
-    # Rename columns and round Y and K values
-    plan[[2]] <- plan[[2]] %>%
-      dplyr::rename(Female.Parent = Parent1, Male.Parent = Parent2) %>%
-      mutate(across(c(Y, K), ~round(., 3)))
+    if (abs(sum(weights) - 1) > 0.01) {
+      stop("Trait weights must sum to 1")
+    }
     
-    plan
+    # Filter inventory data
+    selected_parents <- c(male_parents, female_parents)
+    filtered_inventory <- inventory_data[inventory_data$Clone %in% selected_parents, ]
     
+    if (nrow(filtered_inventory) == 0) {
+      stop("No valid inventory data for selected parents")
+    }
+    
+    # Filter BLUP data
+    blup <- blup[blup$Clone %in% selected_parents, ]
+    if (nrow(blup) == 0) {
+      stop("No BLUP data available for selected parents")
+    }
+    
+    # Filter relationship matrix
+    amat <- tryCatch({
+      as.matrix(amat[selected_parents, selected_parents])
+    }, error = function(e) {
+      stop("Error processing relationship matrix: ", e$message)
+    })
+    
+    # Create crossing plan
+    cross_plan <- SimpleMating::planCross(TargetPop = female_parents, TargetPop2 = male_parents)
+    
+    # Debug print
+    print("Cross plan:")
+    print(head(cross_plan))
+    print(paste("Number of crosses:", nrow(cross_plan)))
+    
+    # Predict mid-parent average
+    mpa <- tryCatch({
+      SimpleMating::getMPA(MatePlan = cross_plan,
+                          Criterion = blup[,1:4],
+                          K = amat,
+                          Weights = weights)
+    }, error = function(e) {
+      print(paste("Error in MPA calculation:", e$message))
+      return(NULL)
+    })
+    
+    if (is.null(mpa)) {
+      return(list(crosses = data.frame(Message = "Error in MPA calculation"), plot = NULL))
+    }
+    
+
+    # Select crosses
+    optimized_plan <- tryCatch({
+      plan <- SimpleMating::selectCrosses(data = mpa,
+                                        n.cross = n_crosses,
+                                        max.cross = max_crosses_per_parent,
+                                        min.cross = 1,
+                                        culling.pairwise.k = culling_k)
+      
+      if (is.null(plan) || length(plan) < 2 || is.null(plan[[2]])) {
+        return(NULL)
+      }
+      
+      # Rename columns and round Y and K values
+      plan[[2]] <- plan[[2]] %>%
+        rename(Female.Parent = Parent1, Male.Parent = Parent2) %>%
+        mutate(across(c(Y, K), ~round(., 3)))
+      
+      plan
+      
+    }, error = function(e) {
+      print(paste("Error in cross selection:", e$message))
+      return(NULL)
+    })
+    
+    if (is.null(optimized_plan)) {
+      return(list(
+        crosses = data.frame(
+          Message = "No valid crosses found. Try adjusting the culling parameter or increasing the number of parents."
+        ), 
+        plot = NULL
+      ))
+    }
+
+    
+    # Prepare output
+    crosses <- optimized_plan[[2]]
+    plot <- optimized_plan[[3]]
+    
+    return(list(crosses = crosses, plot = plot))
   }, error = function(e) {
-    print(paste("Error in cross selection:", e$message))
-    return(NULL)
-  })
-  
-  if (is.null(optimized_plan)) {
+    # Return informative error message
     return(list(
-      crosses = data.frame(
-        Message = "No valid crosses found. Try adjusting the culling parameter or increasing the number of parents."
-      ), 
+      crosses = data.frame(Message = paste("Error:", e$message)),
       plot = NULL
     ))
+
+  }, warning = function(w) {
+    # Log warning but continue
+    warning(w$message)
+  })
+
   }
   
-  # Prepare output
-  crosses <- optimized_plan[[2]] %>% 
-    left_join(y=blup %>% dplyr::rename(Female.Parent=Clone)) %>%
-    left_join(y=blup %>% dplyr::rename(Male.Parent=Clone), by="Male.Parent")
  
-  optimized_plan[[3]]$data<- optimized_plan[[3]]$data %>% 
-    left_join(y=blup %>% dplyr::rename(Parent1=Clone)) %>%
-    left_join(y=blup %>% dplyr::rename(Parent2=Clone), by="Parent2")
-  
-  plot <- optimized_plan[[3]]
-  
-  return(list(crosses = crosses, plot = plot))
 }
 
 fetch_pedigree_data <- function(clone) {

@@ -25,6 +25,7 @@ library(bslib)
 library(SimpleMating)
 library(sortable)
 library(shinyjs)
+library(plotly)
 
 
 
@@ -524,16 +525,20 @@ ui <- dashboardPage(
             title = "Optimization Parameters",
             numericInput("n_crosses", "Number of Crosses to Select:", 10, min = 1, max = 100),
             numericInput("max_crosses_per_parent", "Max Crosses per Parent:", 3, min = 1, max = 10),
-            #numericInput("min_crosses_per_parent", "Min Crosses per Parent:", 1, min = 0, max = 5),
+
+            
             sliderInput("culling_k", "Culling Pairwise K:", 
-                       min = 0, max = 1, value = 1, step = 0.05),
+                       min = 0, max = 1, value = 0.5, step = 0.05),
             
-            p(strong("Trait Weights:")),
+            p(strong("Trait Weights (must sum to 1):")),
+            sliderInput("brix", "Average Brix:", 
+                       min = 0, max = 1, value = 0.33, step = 0.01),
+            sliderInput("biomass", "Total Biomass:", 
+                       min = 0, max = 1, value = 0.33, step = 0.01),
+            sliderInput("ratoon", "Ratooning Ability:", 
+                       min = 0, max = 1, value = 0.34, step = 0.01),
+            
             textOutput("weight_sum_warning"),
-            numericInput(inputId="brix", label="Average Brix", value = round(1/3,1)),
-            numericInput(inputId="biomass", label="Total Biomass", value = round(1/3,1)),
-            numericInput(inputId="ratoon", label="Ratooning Ability", value = round(1/3,1)),
-            
             
             actionButton("run_optimization", "Run Optimization")
           ),
@@ -775,7 +780,10 @@ output$female_parents <- renderUI({
                        max_crosses_per_parent = input$max_crosses_per_parent,
                        # min_crosses_per_parent = input$min_crosses_per_parent,
                        culling_k = input$culling_k,
+
+
                        #prop_sel = input$prop_sel,
+
                        blup=blup_data[,1:4],
                        amat=as.matrix(parent_amat),
                        weights=c(input$brix, input$biomass, input$ratoon))
@@ -794,6 +802,10 @@ output$female_parents <- renderUI({
                      by = c("Female.Parent", "Male.Parent"))
         }
         
+        # Add rank column
+        optimized_crosses$crosses <- optimized_crosses$crosses %>%
+          mutate(Rank = row_number())
+        
         datatable(optimized_crosses$crosses, 
                  options = list(
                    scrollX = TRUE,
@@ -806,18 +818,24 @@ output$female_parents <- renderUI({
       }
     })
     
-     output$optimization_plot <- renderPlotly({
+
+    # Update plot output to use plotly for interactivity
+    output$optimization_plot <- renderPlotly({
+
       if (!is.null(optimized_crosses$plot)) {
         # Extract plot data and ensure it has all required columns
         plot_data <- optimized_crosses$plot$data
         
         # Add rank column and selected status
+
         #plot_data$Rank <- 1:nrow(plot_data)
         #plot_data$Selected <- plot_data$Rank <= input$n_crosses
         
         # Create hover text based on available columns
+       
         hover_text <- paste(
           #"Rank:", plot_data$Rank,
+
           "\nParent1:", plot_data$Parent1,
           "\nParent2:", plot_data$Parent2,
           "\nSelection Index:", round(plot_data$Y, 3),
@@ -825,21 +843,28 @@ output$female_parents <- renderUI({
         )
         
         # Add additional information if available
-        if ("Seed.Quantity.grams" %in% names(plot_data)) {
+
+        if ("Seed.Quantity" %in% names(plot_data)) {
           hover_text <- paste(hover_text, 
                             "\nSeed Quantity:", plot_data$Seed.Quantity)
         }
-        if ("Previous.Cross.Names" %in% names(plot_data)) {
+        if ("Number.of.Crosses" %in% names(plot_data)) {
           hover_text <- paste(hover_text, 
-                            "\nPrevious Crosses:", plot_data$Previous.Cross.Names)
+                            "\nPrevious Crosses:", plot_data$Number.of.Crosses)
         }
         
         # Create new ggplot with hover text and vertical line
         p <- ggplot(plot_data, aes(x = K, y = Y)) +
           # Color points based on selection status
+
+          geom_point(aes(color = Selected), size = 3, alpha = 0.7) +
+          scale_color_manual(values = c("FALSE" = "gray70", "TRUE" = "#1f77b4")) +
+          geom_vline(xintercept = input$culling_k, linetype = "dashed", 
+
           geom_point(aes(color = Sel), size = 3, alpha = 0.7) +
           #scale_color_manual(values = c("Non-Selected" = "gray", "Mating Plan" = "blue")) +
           geom_vline(xintercept = ck, linetype = "dashed", 
+
                     color = "red", size = 1) +
           theme_minimal() +
           theme(
@@ -912,6 +937,39 @@ output$female_parents <- renderUI({
   }
 )
 
+  })
+
+  # Add weight sum warning
+  output$weight_sum_warning <- renderText({
+    total_weight <- input$brix + input$biomass + input$ratoon
+    if (abs(total_weight - 1) > 0.01) {
+      return(paste("Warning: Weights sum to", round(total_weight, 2), "- should equal 1"))
+    } else {
+      return(paste("Weights sum to", round(total_weight, 2)))
+    }
+  })
+
+  # Add global error handler
+  options(shiny.error = function() {
+    # Log the error
+    cat(file=stderr(), "Error occurred:\n")
+    print(geterrmessage())
+    
+    # Show error to user
+    showNotification(
+      "An error occurred. The app will attempt to continue running.",
+      type = "error",
+      duration = NULL
+    )
+    
+    # Return empty/default values instead of crashing
+    return(NULL)
+  })
+
+  # Add session ended handler
+  session$onSessionEnded(function() {
+    cat("Session ended\n")
+    # Cleanup code here if needed
   })
 }
 
