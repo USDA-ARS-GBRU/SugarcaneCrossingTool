@@ -355,11 +355,13 @@ ui <- dashboardPage(
             fluidRow(
               box(column(
                 width=4,
-                DTOutput("inventoryTableMale")
+                h4("Female Parents"),
+                DTOutput("inventoryTableFemale")
               )),
              box(column(
                 width=4,
-                DTOutput("inventoryTableFemale")
+                h4("Male Parents"),
+                DTOutput("inventoryTableMale")
               ))
             )))
 
