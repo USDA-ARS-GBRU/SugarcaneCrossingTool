@@ -349,18 +349,21 @@ ui <- dashboardPage(
         tabPanel(
           "Raw data",
         fluidRow(
-        box(title="These tables shows you the raw data for all parents flowering today, sorted into male and female columns based on techician's inventory",
+        box(title="Raw Data",
+        p("These tables shows you the", strong("raw data"), "for all parents flowering today, sorted into male and female columns based on techician's inventory"),
              textOutput("dataSourceText"),
             width=12,
             fluidRow(
-              box(column(
+              column(
                 width=4,
-                DTOutput("inventoryTableMale")
-              )),
-             box(column(
-                width=4,
+                h4("Female Parents"),
                 DTOutput("inventoryTableFemale")
-              ))
+              ),
+            column(
+                width=4,
+                h4("Male Parents"),
+                DTOutput("inventoryTableMale")
+              )
             )))
 
 
