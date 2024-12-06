@@ -520,9 +520,10 @@ ui <- dashboardPage(
       tabItem(
         tabName = "optimization",
         p("BETA implementation of", a(href="https://github.com/Resende-Lab/SimpleMating", "SimpleMating R package"), "This optimizes the midparent value of potential cross combinations based on a weighted selection index of parental BVs. Breeding values were predicted from S4 trial data and a pedigree relationship matrix. Potential crosses are culled based on pairwise-K value (where value of K is proportional to relatedness."),
-        fluidRow(
-          box(
-            title = "Optimization Parameters",
+        tabsetPanel(
+          type = "tabs",
+          tabPanel(
+            "Optimization Parameters",
             numericInput("n_crosses", "Number of Crosses to Select:", 10, min = 1, max = 100),
             numericInput("max_crosses_per_parent", "Max Crosses per Parent:", 3, min = 1, max = 10),
 
@@ -542,15 +543,44 @@ ui <- dashboardPage(
             
             actionButton("run_optimization", "Run Optimization")
           ),
-          box(
-            title = "Optimized Crossing Plan",
+          tabPanel(
+            "Optimized Crossing Plan",
             DTOutput("optimized_crosses_table")
-          )
-        ),
-        fluidRow(
-          box(
-            title = "Optimization Visualization",
+          ),
+          tabPanel(
+            "Optimization Visualization",
             plotlyOutput("optimization_plot")
+          ),
+          # New tab for possible cross selections
+          tabPanel(
+            "Possible Cross Selections",
+            fluidRow(
+              column(
+                width = 6,
+                box(
+                  title = "Female Parents",
+                  width = NULL,
+                  uiOutput("female_selection_ui")
+                )
+              ),
+              column(
+                width = 6,
+                box(
+                  title = "Male Parents", 
+                  width = NULL,
+                  uiOutput("male_selection_ui")
+                )
+              )
+            ),
+            fluidRow(
+              box(
+                title = "Selected Cross Combinations",
+                width = 12,
+                uiOutput("remove_selected_crosses"),
+                DTOutput("cross_combinations_table"),
+                downloadButton("download_crosses", "Download Selected Crosses")
+              )
+            )
           )
         )
       )
@@ -922,6 +952,160 @@ output$female_parents <- renderUI({
     cat("Session ended\n")
     # Cleanup code here if needed
   })
+
+  # Reactive values for tracking available crosses
+  cross_counts <- reactiveVal(list())
+  selected_crosses <- reactiveVal(data.frame())
+  
+  # Generate UI for female parent selection
+  output$female_selection_ui <- renderUI({
+    female_parents <- input$female_list
+    if (length(female_parents) == 0) {
+      return(HTML("<p>Please assign female parents in the Parent Sorting tab first.</p>"))
+    }
+    
+    # Get inventory data with flowering counts
+    inventory_data <- inventory_init()$female
+    
+    # Create choices list with names and flowering counts
+    choices <- sapply(female_parents, function(p) {
+      count <- inventory_data$FlowerCount[inventory_data$Clone == p]
+      remaining <- count - sum(selected_crosses()$Female == p, na.rm = TRUE)
+      remaining <- max(0, remaining)
+      paste0(p, " (", remaining, " available crosses)")
+    })
+    
+    checkboxGroupInput(
+      "selected_females",
+      "Select Female Parents:",
+      choices = setNames(female_parents, choices)
+    )
+  })
+  
+  # Generate UI for male parent selection
+  output$male_selection_ui <- renderUI({
+    male_parents <- input$male_list
+    if (length(male_parents) == 0) {
+      return(HTML("<p>Please assign male parents in the Parent Sorting tab first.</p>"))
+    }
+    
+    # Get inventory data with flowering counts
+    inventory_data <- inventory_init()$male
+    
+    # Create choices list with names and flowering counts
+    choices <- sapply(male_parents, function(p) {
+      count <- inventory_data$FlowerCount[inventory_data$Clone == p]
+      remaining <- count - sum(selected_crosses()$Male == p, na.rm = TRUE)
+      remaining <- max(0, remaining)
+      paste0(p, " (", remaining, " available crosses)")
+    })
+    
+    checkboxGroupInput(
+      "selected_males",
+      "Select Male Parents:",
+      choices = setNames(male_parents, choices)
+    )
+  })
+
+  # Update cross combinations when selections change
+  observeEvent(c(input$selected_females, input$selected_males), {
+    selected_females <- input$selected_females
+    selected_males <- input$selected_males
+    
+    if (!is.null(selected_females) && !is.null(selected_males) && 
+        length(selected_females) > 0 && length(selected_males) > 0) {
+      
+      inventory_data_female <- inventory_init()$female
+      inventory_data_male <- inventory_init()$male
+      current_crosses <- selected_crosses()
+      
+      # Generate new combinations
+      new_combinations <- expand.grid(
+        Female = selected_females,
+        Male = selected_males,
+        stringsAsFactors = FALSE
+      )
+      
+      # Filter out combinations that would exceed flowering counts
+      valid_combinations <- new_combinations[0,]
+      
+      for (i in 1:nrow(new_combinations)) {
+        female <- new_combinations$Female[i]
+        male <- new_combinations$Male[i]
+        
+        female_count <- inventory_data_female$FlowerCount[inventory_data_female$Clone == female]
+        male_count <- inventory_data_male$FlowerCount[inventory_data_male$Clone == male]
+        
+        female_used <- sum(current_crosses$Female == female, na.rm = TRUE)
+        male_used <- sum(current_crosses$Male == male, na.rm = TRUE)
+        
+        if (female_used < female_count && male_used < male_count) {
+          valid_combinations <- rbind(valid_combinations, new_combinations[i,])
+        }
+      }
+      
+      if (nrow(valid_combinations) > 0) {
+        # Add Status and Available_Crosses columns
+        valid_combinations$Status <- "Selected"
+        valid_combinations$Female_Remaining <- sapply(valid_combinations$Female, function(p) {
+          count <- inventory_data_female$FlowerCount[inventory_data_female$Clone == p]
+          remaining <- count - sum(current_crosses$Female == p, na.rm = TRUE)
+          max(0, remaining)
+        })
+        valid_combinations$Male_Remaining <- sapply(valid_combinations$Male, function(p) {
+          count <- inventory_data_male$FlowerCount[inventory_data_male$Clone == p]
+          remaining <- count - sum(current_crosses$Male == p, na.rm = TRUE)
+          max(0, remaining)
+        })
+        
+        # Combine with existing crosses
+        if (!is.null(current_crosses) && nrow(current_crosses) > 0) {
+          valid_combinations <- rbind(current_crosses, valid_combinations)
+        }
+        
+        selected_crosses(valid_combinations)
+      }
+    }
+  })
+  
+  # Render cross combinations table
+  output$cross_combinations_table <- renderDT({
+    crosses <- selected_crosses()
+    if (!is.null(crosses) && nrow(crosses) > 0) {
+      datatable(crosses,
+                options = list(pageLength = 10),
+                selection = 'multiple')
+    }
+  })
+  
+  # Add remove selected crosses button
+  output$remove_selected_crosses <- renderUI({
+    actionButton("remove_crosses", "Remove Selected Crosses")
+  })
+  
+  # Handle removing selected crosses
+  observeEvent(input$remove_crosses, {
+    selected_rows <- input$cross_combinations_table_rows_selected
+    if (!is.null(selected_rows)) {
+      current_crosses <- selected_crosses()
+      if (nrow(current_crosses) > 0) {
+        selected_crosses(current_crosses[-selected_rows,])
+      }
+    }
+  })
+  
+  # Download handler for selected crosses
+  output$download_crosses <- downloadHandler(
+    filename = function() {
+      paste0("selected_crosses_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".csv")
+    },
+    content = function(file) {
+      crosses <- selected_crosses()
+      if (!is.null(crosses) && nrow(crosses) > 0) {
+        write.csv(crosses, file, row.names = FALSE)
+      }
+    }
+  )
 
 }
 
