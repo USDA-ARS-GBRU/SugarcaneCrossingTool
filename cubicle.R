@@ -196,25 +196,40 @@ server <- function(input, output, session) {
             return()
         }
         
-        if (length(selected_rows) > 3) {
-            showNotification("Maximum 3 crosses per cubicle", type = "error")
-            return()
-        }
+        # Add modal dialog for cubicle creation
+        showModal(modalDialog(
+            title = "Create New Cubicle",
+            textInput("new_cubicle_id", "Cubicle ID", 
+                     value = paste0("C", length(cubicles()) + 1)),
+            footer = tagList(
+                modalButton("Cancel"),
+                actionButton("confirm_cubicle", "Create")
+            )
+        ))
         
-        selected_crosses <- crossing_plan()[selected_rows, ]
-        unique_males <- unique(selected_crosses$male)
+        # Store selected rows for use in the confirmation
+        selected_crosses_reactive(crossing_plan()[selected_rows, ])
+    })
+    
+    # Add new reactive value to store temporarily selected crosses
+    selected_crosses_reactive <- reactiveVal(NULL)
+    
+    # Add confirmation handler
+    observeEvent(input$confirm_cubicle, {
+        selected_crosses <- selected_crosses_reactive()
+        new_id <- input$new_cubicle_id
         
-        if (length(unique_males) > 1) {
-            showNotification("All crosses in a cubicle must share the same male", type = "error")
-            return()
-        }
-        
-        # Create new cubicle
+        # Validate ID is unique
         current_cubicles <- cubicles()
-        new_cubicle_id <- length(current_cubicles) + 1
+        if (any(sapply(current_cubicles, function(x) x$id == new_id))) {
+            showNotification("This ID is already in use. Please choose another.", type = "error")
+            return()
+        }
         
+        # Create new cubicle with user-specified ID
+        unique_males <- unique(selected_crosses$male)
         new_cubicle <- list(
-            id = new_cubicle_id,
+            id = new_id,
             male = unique_males[1],
             crosses = selected_crosses,
             notes = ""
@@ -222,13 +237,17 @@ server <- function(input, output, session) {
         
         # Update crossing plan status
         plan_data <- crossing_plan()
+        selected_rows <- which(plan_data$female %in% selected_crosses$female & 
+                              plan_data$male %in% selected_crosses$male)
         plan_data$status[selected_rows] <- "Assigned"
-        plan_data$cubicle_id[selected_rows] <- new_cubicle_id
+        plan_data$cubicle_id[selected_rows] <- new_id
         crossing_plan(plan_data)
         
         # Add new cubicle
-        current_cubicles[[new_cubicle_id]] <- new_cubicle
+        current_cubicles[[length(current_cubicles) + 1]] <- new_cubicle
         cubicles(current_cubicles)
+        
+        removeModal()
     })
     
     # Store cubicle data
@@ -246,6 +265,11 @@ server <- function(input, output, session) {
             div(
                 class = "well",
                 style = "margin: 10px 0;",
+                
+                # Add ID editing field
+                textInput(paste0("cubicle_id_", cubicle$id),
+                         "Cubicle ID:",
+                         value = cubicle$id),
                 
                 # Cubicle header
                 h4(paste("Cubicle", cubicle$id)),
@@ -396,6 +420,33 @@ server <- function(input, output, session) {
                 )
             }
         }
+    })
+    
+    # Add observer for ID changes
+    observe({
+        current_cubicles <- cubicles()
+        
+        lapply(current_cubicles, function(cubicle) {
+            old_id <- cubicle$id
+            new_id <- input[[paste0("cubicle_id_", old_id)]]
+            
+            if (!is.null(new_id) && new_id != old_id) {
+                # Check if new ID is unique
+                if (!any(sapply(current_cubicles, function(x) x$id == new_id))) {
+                    # Update cubicle ID
+                    cubicle$id <- new_id
+                    
+                    # Update crossing plan
+                    plan_data <- crossing_plan()
+                    plan_data$cubicle_id[plan_data$cubicle_id == old_id] <- new_id
+                    crossing_plan(plan_data)
+                    
+                    # Update cubicles list
+                    current_cubicles[[which(sapply(current_cubicles, function(x) x$id == old_id))]] <- cubicle
+                    cubicles(current_cubicles)
+                }
+            }
+        })
     })
 }
 
