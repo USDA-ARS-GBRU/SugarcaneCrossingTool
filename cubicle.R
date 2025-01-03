@@ -1,8 +1,14 @@
+# Install required packages if not already installed
+if (!requireNamespace("openxlsx", quietly = TRUE)) {
+    install.packages("openxlsx")
+}
+
 library(shiny)
 library(shinyjs)
 library(DT)  # For interactive tables
 library(plotly)  # For visualization
 library(readxl)  # Add this for Excel support
+library(openxlsx)  # Add this with other library imports
 
 ui <- fluidPage(
     useShinyjs(),
@@ -60,14 +66,44 @@ ui <- fluidPage(
                 ),
                 
                 tabPanel("Cubicle Layout",
-                    # Container for dynamically created cubicles
-                    uiOutput("cubicles_container"),
+                    # Table for cubicle layout
+                    DTOutput("cubicle_table"),
+                    
+                    # Notes editor modal will be triggered from table
                     
                     # Summary statistics
                     fluidRow(
                         column(12,
                             h3("Summary Statistics"),
                             verbatimTextOutput("statistics")
+                        )
+                    )
+                ),
+                
+                # Add new Export tab
+                tabPanel("Export Data",
+                    fluidRow(
+                        column(12,
+                            h3("Export Crossing Plan and Cubicle Data"),
+                            wellPanel(
+                                textAreaInput("export_description",
+                                            "Add Description/Notes:",
+                                            rows = 4,
+                                            placeholder = "Enter any additional notes or description about this crossing plan..."),
+                                
+                                selectInput("export_format",
+                                          "Export Format:",
+                                          choices = c("CSV" = "csv", 
+                                                    "Excel" = "xlsx")),
+                                
+                                downloadButton("download_data", "Download Data"),
+                                
+                                hr(),
+                                
+                                # Preview section
+                                h4("Data Preview"),
+                                verbatimTextOutput("export_preview")
+                            )
                         )
                     )
                 )
@@ -253,55 +289,51 @@ server <- function(input, output, session) {
     # Store cubicle data
     cubicles <- reactiveVal(list())
     
-    # Render cubicles
-    output$cubicles_container <- renderUI({
+    # Render cubicle table
+    output$cubicle_table <- renderDT({
         current_cubicles <- cubicles()
         
         if (length(current_cubicles) == 0) {
-            return(h4("No cubicles created yet"))
+            return(NULL)
         }
         
-        cubicle_elements <- lapply(current_cubicles, function(cubicle) {
-            div(
-                class = "well",
-                style = "margin: 10px 0;",
-                
-                # Add ID editing field
-                textInput(paste0("cubicle_id_", cubicle$id),
-                         "Cubicle ID:",
-                         value = cubicle$id),
-                
-                # Cubicle header
-                h4(paste("Cubicle", cubicle$id)),
-                
-                # Male cultivar display
-                p(strong("Male: "), cubicle$male),
-                
-                # Display crosses
-                div(
-                    class = "crosses-container",
-                    lapply(1:nrow(cubicle$crosses), function(i) {
-                        cross <- cubicle$crosses[i,]
-                        p(sprintf("Cross %d: %s × %s", i, cross$female, cross$male))
-                    })
-                ),
-                
-                textAreaInput(paste0("notes_", cubicle$id), 
-                             "Notes:", 
-                             value = cubicle$notes),
-                
-                actionButton(paste0("delete_", cubicle$id), "Delete Cubicle", 
-                             class = "btn-danger"),
-                
-                div(
-                    class = "date-info",
-                    p(strong("Planting Date: "), format(input$planting_date, "%B %d, %Y")),
-                    p(strong("Expected Flowering: "), format(input$expected_flowering, "%B %d, %Y"))
-                )
+        # Create data frame from cubicles
+        cubicle_df <- do.call(rbind, lapply(current_cubicles, function(cubicle) {
+            data.frame(
+                Cubicle_ID = cubicle$id,
+                Male = cubicle$male,
+                Females = paste(cubicle$crosses$female, collapse = ", "),
+                Planting_Date = format(input$planting_date, "%Y-%m-%d"),
+                Expected_Flowering = format(input$expected_flowering, "%Y-%m-%d"),
+                Notes = cubicle$notes,
+                stringsAsFactors = FALSE
             )
-        })
+        }))
         
-        do.call(tagList, cubicle_elements)
+        # Create editable datatable
+        datatable(
+            cubicle_df,
+            editable = list(target = "cell", disable = list(columns = c(1, 2, 3, 4, 5))), # Only Notes column editable
+            options = list(
+                pageLength = 10,
+                dom = 'Bfrtip',
+                buttons = c('copy', 'csv', 'excel')
+            ),
+            selection = "single"
+        )
+    })
+    
+    # Add observer for note edits
+    observeEvent(input$cubicle_table_cell_edit, {
+        info <- input$cubicle_table_cell_edit
+        current_cubicles <- cubicles()
+        
+        # Update notes in cubicle data
+        if (info$col == 6) { # Notes column
+            cubicle_id <- current_cubicles[[info$row]]$id
+            current_cubicles[[info$row]]$notes <- info$value
+            cubicles(current_cubicles)
+        }
     })
     
     # Handle ratio displays for each cubicle
@@ -448,6 +480,105 @@ server <- function(input, output, session) {
             }
         })
     })
+    
+    # Create formatted export data
+    format_export_data <- reactive({
+        req(crossing_plan())
+        plan_data <- crossing_plan()
+        cubicle_data <- cubicles()
+        
+        # Format crossing plan with cubicle assignments
+        export_data <- plan_data
+        
+        # Create cubicle layout table
+        cubicle_table <- do.call(rbind, lapply(cubicle_data, function(cubicle) {
+            data.frame(
+                Cubicle_ID = cubicle$id,
+                Male = cubicle$male,
+                Females = paste(cubicle$crosses$female, collapse = ", "),
+                Planting_Date = format(input$planting_date, "%Y-%m-%d"),
+                Expected_Flowering = format(input$expected_flowering, "%Y-%m-%d"),
+                Notes = cubicle$notes,
+                stringsAsFactors = FALSE
+            )
+        }))
+        
+        # Add description if provided
+        attr(export_data, "description") <- input$export_description
+        attr(export_data, "exported_at") <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
+        
+        list(
+            crossing_plan = export_data,
+            cubicle_layout = cubicle_table
+        )
+    })
+    
+    # Preview of export data
+    output$export_preview <- renderPrint({
+        export_data <- format_export_data()
+        
+        cat("Description:", input$export_description, "\n\n")
+        cat("Export will include:\n")
+        cat("- Crossing plan with", nrow(export_data$crossing_plan), "crosses\n")
+        cat("- Cubicle assignments and status\n")
+        if (!is.null(export_data$cubicle_notes)) {
+            cat("- Notes for", nrow(export_data$cubicle_notes), "cubicles\n")
+        }
+        cat("\nExport format:", input$export_format, "\n")
+    })
+    
+    # Download handler
+    output$download_data <- downloadHandler(
+        filename = function() {
+            paste0("crossing_plan_export_", 
+                   format(Sys.time(), "%Y%m%d"), 
+                   ".", input$export_format)
+        },
+        content = function(file) {
+            export_data <- format_export_data()
+            
+            if (input$export_format == "csv") {
+                # Save description to separate text file
+                desc_file <- sub("\\.csv$", "_description.txt", file)
+                writeLines(c(
+                    paste("Description:", input$export_description),
+                    paste("Exported:", attr(export_data$crossing_plan, "exported_at"))
+                ), desc_file)
+                
+                # Create a directory for the CSV files
+                dir_name <- sub("\\.csv$", "_files", file)
+                dir.create(dir_name, showWarnings = FALSE)
+                
+                # Save crossing plan
+                crossing_file <- file.path(dir_name, "crossing_plan.csv")
+                write.csv(export_data$crossing_plan, crossing_file, row.names = FALSE)
+                
+                # Save cubicle layout including notes - this is the main file
+                write.csv(export_data$cubicle_layout, file, row.names = FALSE)
+                
+            } else if (input$export_format == "xlsx") {
+                wb <- openxlsx::createWorkbook()
+                
+                # Add description sheet
+                openxlsx::addWorksheet(wb, "Description")
+                openxlsx::writeData(wb, "Description", 
+                                  data.frame(
+                                      Description = input$export_description,
+                                      Exported = attr(export_data$crossing_plan, "exported_at")
+                                  ))
+                
+                # Add crossing plan sheet
+                openxlsx::addWorksheet(wb, "Crossing Plan")
+                openxlsx::writeData(wb, "Crossing Plan", export_data$crossing_plan)
+                
+                # Add cubicle layout sheet
+                openxlsx::addWorksheet(wb, "Cubicle Layout")
+                openxlsx::writeData(wb, "Cubicle Layout", export_data$cubicle_layout)
+                
+                openxlsx::saveWorkbook(wb, file, overwrite = TRUE)
+            }
+        }
+    )
 }
 
 shinyApp(ui = ui, server = server)
