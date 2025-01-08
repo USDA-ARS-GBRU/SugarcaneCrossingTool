@@ -426,12 +426,41 @@ server <- function(input, output, session) {
         assigned_crosses <- sum(plan_data$status == "Assigned")
         remaining_crosses <- total_crosses - assigned_crosses
         
+        # Get counts for assigned males and females
+        current_cubicles <- cubicles()
+        
+        # Initialize empty vectors to store male and female counts
+        male_counts <- c()
+        female_counts <- c()
+        
+        # Count occurrences of males and females in assigned crosses
+        for (cubicle in current_cubicles) {
+            male <- cubicle$male
+            females <- cubicle$crosses$female
+            
+            # Add to male counts
+            male_counts <- c(male_counts, male)
+            
+            # Add to female counts
+            female_counts <- c(female_counts, females)
+        }
+        
+        # Create summary tables
+        male_summary <- table(male_counts)
+        female_summary <- table(female_counts)
+        
+        # Format the output
+        male_text <- paste(names(male_summary), "-", male_summary, collapse = "\n")
+        female_text <- paste(names(female_summary), "-", female_summary, collapse = "\n")
+        
         paste0(
             "Total Crosses in Plan: ", total_crosses, "\n",
             "Assigned to Cubicles: ", assigned_crosses, "\n",
             "Remaining to Assign: ", remaining_crosses, "\n",
             "Number of Cubicles: ", length(cubicles()), "\n",
-            "Progress: ", round(assigned_crosses/total_crosses * 100, 1), "%"
+            "Progress: ", round(assigned_crosses/total_crosses * 100, 1), "%\n\n",
+            "Male Usage:\n", male_text, "\n\n",
+            "Female Usage:\n", female_text
         )
     })
     
