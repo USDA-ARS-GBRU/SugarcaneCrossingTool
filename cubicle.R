@@ -12,20 +12,120 @@ library(openxlsx)  # Add this with other library imports
 
 ui <- fluidPage(
     useShinyjs(),
-    # Add CSS
+    # Add enhanced CSS
     tags$head(
         tags$style(HTML("
-            .dataTables_wrapper {
-                margin-top: 20px;
-                margin-bottom: 20px;
+            /* Global styles */
+            body {
+                font-family: 'Helvetica Neue', Arial, sans-serif;
+                line-height: 1.6;
             }
-            .well {
-                margin: 10px 0;
+            
+            /* Header styling */
+            .title-panel {
+                background-color: #f8f9fa;
+                padding: 20px;
+                border-bottom: 2px solid #dee2e6;
+                margin-bottom: 30px;
+            }
+            
+            /* Table styling */
+            .dataTables_wrapper {
+                margin: 20px 0;
                 padding: 15px;
+                background: #ffffff;
+                border-radius: 8px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            
+            .dataTable thead th {
+                background-color: #f8f9fa;
+                font-weight: 600;
+                padding: 12px !important;
+            }
+            
+            .dataTable tbody td {
+                padding: 10px !important;
+            }
+            
+            /* Button styling */
+            .btn {
+                padding: 8px 16px;
+                border-radius: 4px;
+                transition: all 0.3s ease;
+            }
+            
+            .btn-primary {
+                background-color: #007bff;
+                border-color: #0056b3;
+            }
+            
+            .btn-primary:hover {
+                background-color: #0056b3;
+                transform: translateY(-1px);
+            }
+            
+            /* Panel and well styling */
+            .well {
+                background-color: #ffffff;
+                border: 1px solid #dee2e6;
+                border-radius: 8px;
+                padding: 20px;
+                margin: 15px 0;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            }
+            
+            /* Tab styling */
+            .nav-tabs {
+                border-bottom: 2px solid #dee2e6;
+            }
+            
+            .nav-tabs .nav-link {
+                border: none;
+                color: #495057;
+                padding: 12px 20px;
+                font-weight: 500;
+            }
+            
+            .nav-tabs .nav-link.active {
+                color: #007bff;
+                border-bottom: 2px solid #007bff;
+                background: transparent;
+            }
+            
+            /* Summary section styling */
+            .summary-stats {
+                background: #f8f9fa;
+                padding: 15px;
+                border-radius: 8px;
+                margin-top: 20px;
+            }
+            
+            /* Modal styling */
+            .modal-content {
+                border-radius: 8px;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            }
+            
+            .modal-header {
+                background-color: #f8f9fa;
+                border-bottom: 1px solid #dee2e6;
+                padding: 15px 20px;
+            }
+            
+            /* Help text styling */
+            .help-text {
+                color: #6c757d;
+                font-size: 0.9rem;
+                margin: 5px 0;
             }
         "))
     ),
-    titlePanel("Breeding Cubicle Manager"),
+    
+    # Update title panel with new class
+    div(class = "title-panel",
+        titlePanel("Breeding Cubicle Manager")
+    ),
     
     sidebarLayout(
         sidebarPanel(
@@ -39,15 +139,16 @@ ui <- fluidPage(
                      )),
             
             # Create cubicle button
-            actionButton("create_cubicle", "Create Cubicle from Selected Crosses"),
+            actionButton("create_cubicle", "Create Cubicle from Selected Crosses", 
+                        class = "btn btn-primary"),
             
             hr(),
             
             # Instructions
-            helpText("1. Upload your optimized crossing plan"),
-            helpText("2. Select up to 3 crosses with the same male"),
-            helpText("3. Click 'Create Cubicle' to group them"),
-            helpText("4. Track your progress in the summary"),
+            helpText(class = "help-text", "1. Upload your optimized crossing plan"),
+            helpText(class = "help-text", "2. Select up to 3 crosses with the same male"),
+            helpText(class = "help-text", "3. Click 'Create Cubicle' to group them"),
+            helpText(class = "help-text", "4. Track your progress in the summary"),
             
             # Dates
             dateInput("planting_date", "Planting Date:", value = Sys.Date()),
@@ -73,7 +174,9 @@ ui <- fluidPage(
                     fluidRow(
                         column(6,
                             h3("Summary Statistics"),
-                            verbatimTextOutput("statistics")
+                            div(class = "summary-stats",
+                                verbatimTextOutput("statistics")
+                            )
                         ),
                         column(6,
                             h3("Parent Usage Summary"),
