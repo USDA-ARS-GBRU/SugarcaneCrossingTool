@@ -69,13 +69,15 @@ ui <- fluidPage(
                     # Table for cubicle layout
                     DTOutput("cubicle_table"),
                     
-                    # Notes editor modal will be triggered from table
-                    
-                    # Summary statistics
+                    # Summary section with two columns
                     fluidRow(
-                        column(12,
+                        column(6,
                             h3("Summary Statistics"),
                             verbatimTextOutput("statistics")
+                        ),
+                        column(6,
+                            h3("Parent Usage Summary"),
+                            DTOutput("parent_summary_table")  # New table output
                         )
                     )
                 ),
@@ -608,6 +610,54 @@ server <- function(input, output, session) {
             }
         }
     )
+    
+    # Add parent summary table
+    output$parent_summary_table <- renderDT({
+        current_cubicles <- cubicles()
+        
+        if (length(current_cubicles) == 0) {
+            return(NULL)
+        }
+        
+        # Initialize vectors for counts
+        male_counts <- c()
+        female_counts <- c()
+        
+        # Count occurrences
+        for (cubicle in current_cubicles) {
+            male <- cubicle$male
+            females <- cubicle$crosses$female
+            
+            male_counts <- c(male_counts, male)
+            female_counts <- c(female_counts, females)
+        }
+        
+        # Create summary tables
+        male_summary <- as.data.frame(table(male_counts))
+        female_summary <- as.data.frame(table(female_counts))
+        
+        # Rename columns
+        names(male_summary) <- c("Parent", "Count")
+        names(female_summary) <- c("Parent", "Count")
+        
+        # Add type column
+        male_summary$Type <- "Male"
+        female_summary$Type <- "Female"
+        
+        # Combine summaries
+        summary_df <- rbind(male_summary, female_summary)
+        
+        # Create datatable
+        datatable(
+            summary_df,
+            options = list(
+                pageLength = 15,
+                dom = 't',  # Show only table, no search/pagination
+                ordering = TRUE
+            ),
+            rownames = FALSE
+        )
+    })
 }
 
 shinyApp(ui = ui, server = server)
