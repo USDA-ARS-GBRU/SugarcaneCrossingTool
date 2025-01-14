@@ -51,6 +51,8 @@ InitCrossTable <- function(cross_list, Cross.Name="Cross.Unique.ID", Female.Pare
     cross_list2 <- cross_list[which(cross_list[["Female.Parent"]] %in% germplasm$Clone & 
                                    cross_list[["Male.Parent"]] %in% germplasm$Clone), ]
     
+    
+    
     if(nrow(cross_list2) == 0) {
       warning("No matching crosses found after filtering")
       return(data.frame())
@@ -89,7 +91,20 @@ InitCrossTable <- function(cross_list, Cross.Name="Cross.Unique.ID", Female.Pare
     #   })
     # }
     
-    return(cross_list2)
+    cross_table<-as.data.frame(aggregate(Cross.Unique.ID ~ Female.Parent + Male.Parent, FUN = c, data = cross_list2)) %>% 
+      left_join(as.data.frame(aggregate(Number.of.Progenies ~ Female.Parent + Male.Parent, FUN = sum, data = cross_list2))) 
+   # %>% left_join(  as.data.frame(aggregate(data.amount ~ Female.Parent + Male.Parent, FUN = sum, data = cross_list2)))
+    
+    cross_table$total.crosses<-apply(cross_table, 1, function(x) {length(x$Cross.Unique.ID)})
+    
+    #cleanup
+   #colnames(cross_table)<-c("Female.Parent", "Male.Parent", "Cross.Names", "Total.Number.of.Progenies", "Seed.Quantity.grams", "Number.of.Crosses")    
+    
+    colnames(cross_table)<-c("Female.Parent", "Male.Parent", "Cross.Names", "Total.Number.of.Progenies", "Number.of.Crosses")    
+    
+    return(cross_table)
+    
+    
     
   }, error = function(e) {
     warning(paste("Error in InitCrossTable:", e$message))
@@ -266,6 +281,7 @@ optimize_crosses <- function(inventory_data, male_parents, female_parents, n_cro
     }
     
     # Filter BLUP data
+    colnames(blup)[1]<-"Clone"
     blup <- blup[blup$Clone %in% selected_parents, ]
     if (nrow(blup) == 0) {
       stop("No BLUP data available for selected parents")
@@ -273,7 +289,7 @@ optimize_crosses <- function(inventory_data, male_parents, female_parents, n_cro
     
     # Filter relationship matrix
     amat <- tryCatch({
-      as.matrix(amat[selected_parents, selected_parents])
+      as.matrix(amat[rownames(amat)%in%selected_parents, colnames(amat)%in%selected_parents])
     }, error = function(e) {
       stop("Error processing relationship matrix: ", e$message)
     })
@@ -290,7 +306,7 @@ optimize_crosses <- function(inventory_data, male_parents, female_parents, n_cro
     mpa <- tryCatch({
       SimpleMating::getMPA(MatePlan = cross_plan,
                           Criterion = blup[,1:4],
-                          K = amat,
+                          K = as.matrix(amat),
                           Weights = weights)
     }, error = function(e) {
       print(paste("Error in MPA calculation:", e$message))
@@ -316,8 +332,8 @@ optimize_crosses <- function(inventory_data, male_parents, female_parents, n_cro
       
       # Rename columns and round Y and K values
       plan[[2]] <- plan[[2]] %>%
-        rename(Female.Parent = Parent1, Male.Parent = Parent2) %>%
-        mutate(across(c(Y, K), ~round(., 3)))
+        dplyr::rename(Female.Parent = Parent1, Male.Parent = Parent2) %>%
+        dplyr::mutate(across(c(Y, K), ~round(.,3)))
       
       plan
       

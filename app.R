@@ -805,9 +805,9 @@ output$female_parents <- renderUI({
                       by = c("Female.Parent", "Male.Parent"))
         }
         
-        # Add rank column
+        #Add rank column
         crosses <- crosses %>%
-          mutate(Rank = row_number())
+          mutate(Rank = 1:input$n_crosses)
         
         datatable(crosses, 
                   options = list(
@@ -839,8 +839,8 @@ output$female_parents <- renderUI({
       
       # Add hover text
       hover_text <- paste(
-        "\nParent1:", plot_data$Parent1,
-        "\nParent2:", plot_data$Parent2,
+        "\nFemale.Parent:", plot_data$Parent1,
+        "\nMale.Parent:", plot_data$Parent2,
         "\nSelection Index:", round(plot_data$Y, 3),
         "\nKinship:", round(plot_data$K, 3)
       )
