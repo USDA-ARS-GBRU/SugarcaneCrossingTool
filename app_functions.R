@@ -48,45 +48,46 @@ InitCrossTable <- function(cross_list, Cross.Name="Cross.Unique.ID", Female.Pare
     }
     
     #filter first! goes faster
-    cross_list2 <- cross_list[which(cross_list[[Female.Parent]] %in% germplasm$Clone & 
-                                   cross_list[[Male.Parent]] %in% germplasm$Clone), ]
+    cross_list2 <- cross_list[which(cross_list[["Female.Parent"]] %in% germplasm$Clone & 
+                                   cross_list[["Male.Parent"]] %in% germplasm$Clone), ]
     
     if(nrow(cross_list2) == 0) {
       warning("No matching crosses found after filtering")
       return(data.frame())
     }
     
-    if(new_crosses == FALSE) {
-      ### get seedlot information
-      tryCatch({
-        cross_names <- gsub("^crossName=|&$", "", 
-                           paste(paste0("crossName=",
-                                      cross_list2[[Cross.Name]], "&"),
-                                 collapse=""))
-        
-        seeds <- brapi::ba_seedlots_details(
-          con = brap2, 
-          crossName = cross_names, 
-          rclass = "data.frame"
-        )
-        
-        if(!is.data.frame(seeds) || nrow(seeds) == 0) {
-          warning("No seedlot data returned")
-          return(data.frame())
-        }
-        
-        seeds$data.amount <- as.numeric(as.character(seeds$data.amount))
-        seeds[[Cross.Name]] <- gsub("SL-", "", seeds$data.seedLotName)
-        
-        #join with subset cross list
-        cross_list2 <- cross_list2 %>% 
-          left_join(seeds, by = Cross.Name)
-        
-      }, error = function(e) {
-        warning(paste("Error getting seedlot details:", e$message))
-        return(data.frame())
-      })
-    }
+    ##seedlots are causing a problem
+    # if(new_crosses == FALSE) {
+    #   ### get seedlot information
+    #   tryCatch({
+    #     cross_names <- gsub("^crossName=|&$", "", 
+    #                        paste(paste0("crossName=",
+    #                                   cross_list2[["Cross.Unique.ID"]], "&"),
+    #                              collapse=""))
+    #     
+    #     seeds <- brapi::ba_seedlots_details(
+    #       con = brap2, 
+    #       crossName = cross_names, 
+    #       rclass = "data.frame"
+    #     )
+    #     
+    #     if(!is.data.frame(seeds) || nrow(seeds) == 0) {
+    #       warning("No seedlot data returned")
+    #       return(data.frame())
+    #     }
+    #     
+    #     seeds$data.amount <- as.numeric(as.character(seeds$data.amount))
+    #     seeds[["Cross.Name"]] <- gsub("SL-", "", seeds$data.seedLotName)
+    #     
+    #     #join with subset cross list
+    #     cross_list2 <- cross_list2 %>% 
+    #       left_join(seeds, by = "Cross.Name")
+    #     
+    #   }, error = function(e) {
+    #     warning(paste("Error getting seedlot details:", e$message))
+    #     return(data.frame())
+    #   })
+    # }
     
     return(cross_list2)
     

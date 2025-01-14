@@ -17,6 +17,7 @@ crosses_server <- function(input, output, session, reactive_cid, inventory_init,
     display_female<-c( unique(input$female_list))
    
     germplasm<-germplasm[which(germplasm$Clone%in%display),]
+    
         if(nrow(germplasm) == 0) {
           return(data.frame(
             Female.Parent = character(0),
@@ -33,7 +34,7 @@ crosses_server <- function(input, output, session, reactive_cid, inventory_init,
           ))
         }
         
-        germplasm <- germplasm[which(germplasm$Clone %in% display), ]
+        #germplasm <- germplasm[which(germplasm$Clone %in% display), ]
         
         # Get historical cross table
         historical_cross_table <- tryCatch({
