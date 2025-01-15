@@ -26,6 +26,8 @@ library(SimpleMating)
 library(sortable)
 library(shinyjs)
 library(plotly)
+library(openxlsx) 
+library(writexl)
 
 
 # Include necessary JavaScript libraries
@@ -110,10 +112,7 @@ ui <- dashboardPage(
     ),
     p("Don't forget to push 'Get Flower Inventory", strong("each"), "each time you choose a new date"),
     sidebarMenu(
-      menuItem("Home",
-               tabName = "home",
-               icon = icon("home")
-      ),
+      menuItem("Welcome", tabName = "welcome", icon = icon("home")),
       menuItem("Inventory/Sorting",
                tabName = "flowering",
                icon = icon("seedling")
@@ -137,7 +136,10 @@ ui <- dashboardPage(
       menuItem("Download Data",
                tabName = "download",
                icon = icon("download")
-      )
+      ),
+      menuItem("Cubicle Manager",
+               tabName = "cubicle",
+               icon = icon("th"))
       )
     ),
 
@@ -258,6 +260,11 @@ ui <- dashboardPage(
         }
       "))
     ),
+    tags$script("
+      $(document).ready(function() {
+        $('a[data-value=\"welcome\"]').tab('show');
+      });
+    "),
     tabItems(
 
       ### Home content ----
@@ -462,6 +469,11 @@ ui <- dashboardPage(
       title = "Download Optimized Crossing Plan",
       p("Click the button below to download the optimized crossing plan as an Excel file."),
       downloadButton("download_optimized_plan", "Download Optimized Crossing Plan")
+    ),
+    box(
+      title = "Download Cubicle Layout",
+      p("Download the current cubicle assignments and layout as an Excel file."),
+      downloadButton("download_cubicle_layout", "Download Cubicle Layout")
     )
   )
 ),
@@ -469,13 +481,14 @@ ui <- dashboardPage(
       ### Cross Optimization tab content ----
       tabItem(
         tabName = "optimization",
-        p("BETA implementation of", a(href="https://github.com/Resende-Lab/SimpleMating", "SimpleMating R package"), "This optimizes the midparent value of potential cross combinations based on a weighted selection index of parental BVs. Breeding values were predicted from S4 trial data and a pedigree relationship matrix. Potential crosses are culled based on pairwise-K value (where value of K is proportional to relatedness."),
+        p("BETA implementation of", a(href="https://github.com/Resende-Lab/SimpleMating", "SimpleMating R package"), 
+          "This optimizes the midparent value of potential cross combinations based on a weighted selection index of parental BVs."),
         fluidRow(
           box(
             title = "Optimization Parameters",
+            width = 6,
             numericInput("n_crosses", "Number of Crosses to Select:", 10, min = 1, max = 100),
             numericInput("max_crosses_per_parent", "Max Crosses per Parent:", 3, min = 1, max = 10),
-            
             sliderInput("culling_k", "Culling Pairwise K:", 
                        min = 0, max = 1, value = 0.5, step = 0.05),
             
@@ -492,13 +505,146 @@ ui <- dashboardPage(
           ),
           box(
             title = "Optimized Crossing Plan",
+            width = 6,
             DTOutput("optimized_crosses_table")
           )
         ),
         fluidRow(
           box(
             title = "Optimization Visualization",
+            width = 12,
             plotlyOutput("optimization_plot")
+          )
+        )
+      ),
+
+      tabItem(
+        tabName = "cubicle",
+        fluidRow(
+          box(
+            title = "Cubicle Management",
+            width = 12,
+            p("Organize your optimized crosses into breeding cubicles. Each cubicle can contain up to 3 crosses with the same male parent."),
+            actionButton("create_cubicle", "Create Cubicle from Selected Crosses", 
+                        class = "btn btn-primary"),
+            actionButton("print_layout", "Print Layout", 
+                        class = "btn btn-info"),
+            downloadButton("save_data", "Save Layout"),
+            fileInput("load_data", "Load Layout"),
+            hr(),
+            helpText(class = "help-text", "1. Select up to 3 crosses with the same male from the table below"),
+            helpText(class = "help-text", "2. Click 'Create Cubicle' to group them"),
+            helpText(class = "help-text", "3. Track your progress in the summary"),
+            
+            dateInput("planting_date", "Planting Date:", value = Sys.Date()),
+            dateInput("expected_flowering", "Expected Flowering:", value = Sys.Date() + 60)
+          )
+        ),
+        fluidRow(
+          column(8,
+            box(
+              title = "Available Crosses",
+              width = 12,
+              DTOutput("crossing_table")
+            ),
+            box(
+              title = "Parent Usage Summary",
+              width = 12,
+              DTOutput("parent_summary_table")
+            )
+          ),
+          column(4,
+            box(
+              title = "Cubicle Layout",
+              width = 12,
+              DTOutput("cubicle_table"),
+              uiOutput("cubicle_ratios")  # New UI element for ratios
+            ),
+            box(
+              title = "Summary Statistics",
+              width = 12,
+              verbatimTextOutput("statistics")
+            )
+          )
+        )
+      ),
+
+      tabItem(
+        tabName = "welcome",
+        fluidRow(
+          box(
+            title = "Welcome to the Sugarcane Integrated Breeding System (SIBS) Sugarcane Crossing Tool (SCT)",
+            width = 12,
+            status = "primary",
+            solidHeader = TRUE,
+            
+            p("Welcome to SCT! This application helps manage and optimize your breeding program. Follow these steps to get started:"),
+            
+            h4("Step 1: Initial Setup"),
+            tags$ol(
+              tags$li(strong("Login Information:"),
+                tags$ul(
+                  tags$li("Select a location from the sidebar"),
+                  tags$li("Choose your breeder name"),
+                  tags$li("Select an inventory date")
+                )
+              ),
+              tags$li(strong("Get Inventory Data:"),
+                tags$ul(
+                  tags$li("Click 'Get Flower Inventory' button"),
+                  tags$li("View your data in the Flowering Inventory tab"),
+                  tags$li("Sort flowering clones by gender")
+                )
+              ),
+              tags$li(strong("Parent Assignment:"),
+                tags$ul(
+                  tags$li("Move to the Inventory/Sorting tab"),
+                  tags$li("Assign roles (male/female) to parents"),
+                  tags$li("Review parent statistics")
+                )
+              ),
+              tags$li(strong("Cross Optimization:"),
+                tags$ul(
+                  tags$li("Navigate to Cross Beta Optimization tab"),
+                  tags$li("Set number of desired crosses"),
+                  tags$li("Adjust maximum crosses per parent"),
+                  tags$li("Set kinship threshold"),
+                  tags$li("Adjust trait weights (must sum to 1)"),
+                  tags$li("Run optimization"),
+                  tags$li("Review results in plot and table")
+                )
+              ),
+              tags$li(strong("Cubicle Management:"),
+                tags$ul(
+                  tags$li("Go to Cubicle Manager tab"),
+                  tags$li("Select crosses from optimization results"),
+                  tags$li("Create cubicles (max 3 females per male)"),
+                  tags$li("Set planting and flowering dates"),
+                  tags$li("Add notes as needed"),
+                  tags$li("Monitor female-to-male ratios"),
+                  tags$li("Download or print layout")
+                )
+              )
+            ),
+            
+            hr(),
+            
+            h4("Important Notes:"),
+            tags$ul(
+              tags$li("Always click 'Get Flower Inventory' when changing dates"),
+              tags$li("Parent assignments can be modified at any time"),
+              tags$li("Optimization parameters can be adjusted as needed"),
+              tags$li("Monitor female-to-male ratios in cubicles"),
+              tags$li("Save your work using the download options")
+            ),
+            
+            hr(),
+            
+            div(
+              class = "alert alert-info",
+              icon("info-circle"), 
+              " For detailed information about each feature, look for the help icons (?) in each section."
+            )
           )
         )
       )
@@ -594,8 +740,8 @@ server <- function(input, output, session) {
   
   # Add reactiveValues for sharing data between modules
   rv <- reactiveValues(
-    previous_crosses = NULL,
-    selectedColumns = NULL
+    optimization_result = NULL,
+    previous_crosses = NULL
   )
   
   # Add the renderText for dataSourceText
@@ -695,7 +841,32 @@ server <- function(input, output, session) {
     ))
   })
   
-  # Cross Optimization
+  # Initialize crossing plan from optimization results
+  observe({
+    # Get the optimized crosses from the optimization module
+    opt_result <- optimize_crosses(
+      inventory_data = inventory_init(), 
+      male_parents = clone_assignments()$male,
+      female_parents = clone_assignments()$female,
+      n_crosses = input$n_crosses,
+      max_crosses_per_parent = input$max_crosses_per_parent,
+      culling_k = input$culling_k,
+      prop_sel = input$prop_sel,
+      blup = blup_data[,1:4],
+      amat = as.matrix(parent_amat),
+      weights = c(input$brix, input$biomass, input$ratoon)
+    )
+    
+    # Check if optimization was successful and has crosses
+    if (!is.null(opt_result) && !is.null(opt_result$crosses) && nrow(opt_result$crosses) > 0) {
+      plan_data <- opt_result$crosses
+      plan_data$status <- "Unassigned"
+      plan_data$cubicle_id <- NA
+      crossing_plan(plan_data)
+    }
+  })
+
+  # Modify the optimization event handler to store results
   observeEvent(input$run_optimization, {
     # Get current inventory data
     inventory_data <- inventory_init()
@@ -711,42 +882,45 @@ server <- function(input, output, session) {
     }
     
     # Run optimization
-    optimized_crosses <- tryCatch({
-      optimize_crosses(inventory_data, 
-                       male_parents,
-                       female_parents,
-                       n_crosses = input$n_crosses,
-                       #min_crosses_per_parent = 1,
-                       max_crosses_per_parent = input$max_crosses_per_parent,
-                       # min_crosses_per_parent = input$min_crosses_per_parent,
-                       culling_k = input$culling_k,
-                       prop_sel = input$prop_sel,
-                       blup=blup_data[,1:4],
-                       amat=as.matrix(parent_amat),
-                       weights=c(input$brix, input$biomass, input$ratoon))
+    rv$optimization_result <- tryCatch({
+      optimize_crosses(
+        inventory_data = inventory_data, 
+        male_parents = male_parents,
+        female_parents = female_parents,
+        n_crosses = input$n_crosses,
+        max_crosses_per_parent = input$max_crosses_per_parent,
+        culling_k = input$culling_k,
+        prop_sel = input$prop_sel,
+        blup = blup_data[,1:4],
+        amat = as.matrix(parent_amat),
+        weights = c(input$brix, input$biomass, input$ratoon)
+      )
     }, error = function(e) {
       showNotification(paste("Error in optimization:", e$message), type = "error")
-      return(list(crosses = data.frame(), plot = NULL))
+      return(NULL)
     })
     
-    # Display results
+    # Update table output
     output$optimized_crosses_table <- renderDT({
-      if (!is.null(optimized_crosses$crosses) && nrow(optimized_crosses$crosses) > 0) {
+      req(rv$optimization_result)
+      crosses <- rv$optimization_result$crosses
+      
+      if (!is.null(crosses) && nrow(crosses) > 0) {
         # Join with previous crosses if available
         if (!is.null(rv$previous_crosses)) {
-          optimized_crosses$crosses <- optimized_crosses$crosses %>%
+          crosses <- crosses %>%
             left_join(rv$previous_crosses, 
                      by = c("Female.Parent", "Male.Parent"))
         }
         
         # Add rank column
-        optimized_crosses$crosses <- optimized_crosses$crosses %>%
+        crosses <- crosses %>%
           mutate(Rank = row_number())
         
-        datatable(optimized_crosses$crosses, 
+        datatable(crosses, 
                  options = list(
                    scrollX = TRUE,
-                   fixedColumns = list(leftColumns = 2),
+                   fixedColumns = list(leftColumns = 3),
                    pageLength = 10
                  ))
       } else {
@@ -754,94 +928,6 @@ server <- function(input, output, session) {
                  options = list(pageLength = 10))
       }
     })
-    
-    # Update plot output to use plotly for interactivity
-    output$optimization_plot <- renderPlotly({
-      if (!is.null(optimized_crosses$plot)) {
-        # Extract plot data and ensure it has all required columns
-        plot_data <- optimized_crosses$plot$data
-        
-        # Add rank column and selected status
-        plot_data$Rank <- 1:nrow(plot_data)
-        plot_data$Selected <- plot_data$Rank <= input$n_crosses
-        
-        # Create hover text based on available columns
-        hover_text <- paste(
-          "Rank:", plot_data$Rank,
-          "\nParent1:", plot_data$Parent1,
-          "\nParent2:", plot_data$Parent2,
-          "\nSelection Index:", round(plot_data$Y, 3),
-          "\nKinship:", round(plot_data$K, 3)
-        )
-        
-        # Add additional information if available
-        if ("Seed.Quantity" %in% names(plot_data)) {
-          hover_text <- paste(hover_text, 
-                            "\nSeed Quantity:", plot_data$Seed.Quantity)
-        }
-        if ("Number.of.Crosses" %in% names(plot_data)) {
-          hover_text <- paste(hover_text, 
-                            "\nPrevious Crosses:", plot_data$Number.of.Crosses)
-        }
-        
-        # Create new ggplot with hover text and vertical line
-        p <- ggplot(plot_data, aes(x = K, y = Y)) +
-          # Color points based on selection status
-          geom_point(aes(color = Selected), size = 3, alpha = 0.7) +
-          scale_color_manual(values = c("FALSE" = "gray70", "TRUE" = "#1f77b4")) +
-          geom_vline(xintercept = input$culling_k, linetype = "dashed", 
-                    color = "red", size = 1) +
-          theme_minimal() +
-          theme(
-            panel.grid.major = element_line(color = "gray90"),
-            panel.grid.minor = element_line(color = "gray95"),
-            axis.text = element_text(color = "gray30"),
-            axis.title = element_text(color = "gray30", size = 12),
-            plot.background = element_rect(fill = "white", color = NA),
-            panel.background = element_rect(fill = "white", color = NA),
-            legend.position = "top"
-          ) +
-          labs(
-            x = "Kinship Coefficient",
-            y = "Selection Index",
-            title = paste("Cross Optimization Plot (Top", input$n_crosses, "Crosses Highlighted)"),
-            color = "Selected Crosses"
-          ) +
-          aes(text = hover_text)
-        
-        ggplotly(p, tooltip = "text") %>%
-          layout(
-            hoverlabel = list(bgcolor = "white"),
-            plot_bgcolor = "white",
-            paper_bgcolor = "white"
-          )
-      } else {
-        plot_ly() %>%
-          add_annotations(
-            text = "No plot available",
-            x = 0.5,
-            y = 0.5,
-            showarrow = FALSE
-          )
-      }
-    })
-
-    output$download_optimized_plan <- downloadHandler(
-  filename = function() {
-    paste("optimized_crossing_plan_", Sys.Date(), ".xlsx", sep = "")
-  },
-  content = function(file) {
-    # Check if optimized crosses exist
-    if (!is.null(optimized_crosses$crosses) && nrow(optimized_crosses$crosses) > 0) {
-      writexl::write_xlsx(optimized_crosses$crosses, path = file)
-    } else {
-      # If no optimized crosses, create a dummy dataframe with a message
-      dummy_data <- data.frame(Message = "No optimized crosses available. Please run the optimization first.")
-      writexl::write_xlsx(dummy_data, path = file)
-    }
-  }
-)
-
   })
 
   # Add weight sum warning
@@ -852,6 +938,421 @@ server <- function(input, output, session) {
     } else {
       return(paste("Weights sum to", round(total_weight, 2)))
     }
+  })
+
+  # Store crossing plan data
+  crossing_plan <- reactiveVal(NULL)
+
+  # Display crossing plan table
+  output$crossing_table <- renderDT({
+    req(crossing_plan())
+    datatable(
+      crossing_plan(),
+      selection = 'multiple',
+      options = list(
+        pageLength = 10,
+        searching = TRUE,
+        ordering = TRUE
+      )
+    )
+  })
+
+  # Store cubicle data
+  cubicles <- reactiveVal(list())
+
+  # Create new cubicle
+  observeEvent(input$create_cubicle, {
+    req(crossing_plan())
+    selected_rows <- input$crossing_table_rows_selected
+    
+    if (length(selected_rows) == 0) {
+      showNotification("Please select crosses first", type = "error")
+      return()
+    }
+    
+    selected_crosses <- crossing_plan()[selected_rows, ]
+    
+    # Check if all selected crosses have the same male parent
+    if (length(unique(selected_crosses$Male.Parent)) > 1) {
+      showNotification("All selected crosses must have the same male parent", type = "error")
+      return()
+    }
+    
+    # Create new cubicle
+    new_cubicle <- list(
+      id = paste0("C", length(cubicles()) + 1),
+      male = selected_crosses$Male.Parent[1],
+      crosses = selected_crosses,
+      planting_date = input$planting_date,
+      expected_flowering = input$expected_flowering,
+      notes = ""
+    )
+    
+    # Update cubicles
+    current_cubicles <- cubicles()
+    current_cubicles[[length(current_cubicles) + 1]] <- new_cubicle
+    cubicles(current_cubicles)
+    
+    # Update crossing plan status
+    plan_data <- crossing_plan()
+    plan_data$status[selected_rows] <- "Assigned"
+    plan_data$cubicle_id[selected_rows] <- new_cubicle$id
+    crossing_plan(plan_data)
+  })
+
+  # Display cubicle table
+  output$cubicle_table <- renderDT({
+    current_cubicles <- cubicles()
+    
+    if (length(current_cubicles) == 0) {
+      return(NULL)
+    }
+    
+    cubicle_df <- do.call(rbind, lapply(current_cubicles, function(cubicle) {
+      data.frame(
+        Cubicle_ID = cubicle$id,
+        Male = cubicle$male,
+        Females = paste(cubicle$crosses$Female.Parent, collapse = ", "),
+        Planting_Date = format(cubicle$planting_date, "%Y-%m-%d"),
+        Expected_Flowering = format(cubicle$expected_flowering, "%Y-%m-%d"),
+        Notes = cubicle$notes,
+        stringsAsFactors = FALSE
+      )
+    }))
+    
+    datatable(
+      cubicle_df,
+      editable = list(target = "cell", disable = list(columns = c(1, 2, 3, 4, 5))),
+      options = list(
+        pageLength = 10,
+        dom = 'Bfrtip',
+        buttons = c('copy', 'csv', 'excel')
+      )
+    )
+  })
+
+  # Add this observer to handle note updates
+  observeEvent(input$cubicle_table_cell_edit, {
+    info <- input$cubicle_table_cell_edit
+    i <- info$row
+    j <- info$col
+    v <- info$value
+    
+    # Only process if it's the Notes column (column 6)
+    if(j == 6) {
+      current_cubicles <- cubicles()
+      # Update the notes in the corresponding cubicle
+      current_cubicles[[i]]$notes <- v
+      cubicles(current_cubicles)
+    }
+  })
+
+  # Display statistics
+  output$cubicle_statistics <- renderText({
+    plan_data <- crossing_plan()
+    if (is.null(plan_data)) return("No crossing plan loaded")
+    
+    total_crosses <- nrow(plan_data)
+    assigned_crosses <- sum(plan_data$status == "Assigned")
+    remaining_crosses <- total_crosses - assigned_crosses
+    
+    paste0(
+      "Total Crosses in Plan: ", total_crosses, "\n",
+      "Assigned to Cubicles: ", assigned_crosses, "\n",
+      "Remaining to Assign: ", remaining_crosses, "\n",
+      "Number of Cubicles: ", length(cubicles()), "\n",
+      "Progress: ", round(assigned_crosses/total_crosses * 100, 1), "%"
+    )
+  })
+
+  # Update the optimization plot
+  output$optimization_plot <- renderPlotly({
+    req(rv$optimization_result)
+    
+    # Get the optimization result data
+    opt_data <- rv$optimization_result$crosses
+    
+    if (is.null(opt_data)) return(NULL)
+    
+    # Add Selected column based on ranking
+    n_selected <- input$n_crosses
+    total_crosses <- nrow(opt_data)
+    
+    # Create Selected column with TRUE for top n_crosses and FALSE for the rest
+    opt_data$Selected <- FALSE  # Initialize all as FALSE
+    if (n_selected > 0 && n_selected <= total_crosses) {
+      opt_data$Selected[1:n_selected] <- TRUE
+    }
+    
+    # Create hover text
+    hover_text <- paste(
+      "Female:", opt_data$Female.Parent,
+      "\nMale:", opt_data$Male.Parent,
+      "\nSelection Index:", round(opt_data$Y, 3),
+      "\nKinship:", round(opt_data$K, 3),
+      "\nSelected:", opt_data$Selected
+    )
+    
+    # Create ggplot
+    p <- ggplot(opt_data, aes(x = K, y = Y)) +
+      geom_point(aes(color = Selected), size = 3, alpha = 0.7) +
+      scale_color_manual(values = c("FALSE" = "gray70", "TRUE" = "#1f77b4")) +
+      geom_vline(xintercept = input$culling_k, linetype = "dashed") +
+      theme_minimal() +
+      labs(
+        x = "Kinship Coefficient",
+        y = "Selection Index",
+        title = paste("Cross Optimization Plot (Top", n_selected, "Crosses Highlighted)"),
+        color = "Selected Crosses"
+      ) +
+      aes(text = hover_text)
+    
+    # Convert to plotly
+    ggplotly(p, tooltip = "text") %>%
+      layout(
+        hoverlabel = list(bgcolor = "white"),
+        plot_bgcolor = "white",
+        paper_bgcolor = "white"
+      )
+  })
+
+  # Add this for the cubicle visualization
+  output$crossing_plot <- renderPlotly({
+    req(crossing_plan())
+    plan_data <- crossing_plan()
+    
+    # Create the plot
+    plot_ly(plan_data, 
+            x = ~K,  # Using K from optimization
+            y = ~Y,  # Using Y from optimization
+            color = ~status,
+            text = ~paste("Female:", Female.Parent,
+                         "<br>Male:", Male.Parent,
+                         "<br>Status:", status,
+                         "<br>Index:", round(Y, 3),
+                         "<br>Kinship:", round(K, 3)),
+            type = "scatter",
+            mode = "markers",
+            marker = list(size = 10)) %>%
+      layout(
+        title = "Crossing Plan Status",
+        xaxis = list(title = "Kinship Coefficient (K)"),
+        yaxis = list(title = "Selection Index (Y)"),
+        showlegend = TRUE
+      )
+  })
+
+  # Add this to your server function
+  output$download_cubicle_layout <- downloadHandler(
+    filename = function() {
+      paste("cubicle_layout_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
+    },
+    content = function(file) {
+      # Create a new workbook
+      wb <- createWorkbook()
+      
+      # Add cubicle layout sheet
+      addWorksheet(wb, "Cubicle Layout")
+      current_cubicles <- cubicles()
+      if (length(current_cubicles) > 0) {
+        cubicle_df <- do.call(rbind, lapply(current_cubicles, function(cubicle) {
+          data.frame(
+            Cubicle_ID = cubicle$id,
+            Male = cubicle$male,
+            Females = paste(cubicle$crosses$Female.Parent, collapse = ", "),
+            Planting_Date = format(cubicle$planting_date, "%Y-%m-%d"),
+            Expected_Flowering = format(cubicle$expected_flowering, "%Y-%m-%d"),
+            Notes = cubicle$notes,
+            stringsAsFactors = FALSE
+          )
+        }))
+        writeData(wb, "Cubicle Layout", cubicle_df)
+      }
+      
+      # Add crossing plan sheet
+      addWorksheet(wb, "Crossing Plan")
+      if (!is.null(crossing_plan())) {
+        writeData(wb, "Crossing Plan", crossing_plan())
+      }
+      
+      # Add summary statistics sheet
+      addWorksheet(wb, "Summary")
+      plan_data <- crossing_plan()
+      if (!is.null(plan_data)) {
+        total_crosses <- nrow(plan_data)
+        assigned_crosses <- sum(plan_data$status == "Assigned")
+        summary_data <- data.frame(
+          Metric = c("Total Crosses", "Assigned Crosses", "Remaining Crosses", "Number of Cubicles", "Progress"),
+          Value = c(
+            total_crosses,
+            assigned_crosses,
+            total_crosses - assigned_crosses,
+            length(cubicles()),
+            paste0(round(assigned_crosses/total_crosses * 100, 1), "%")
+          )
+        )
+        writeData(wb, "Summary", summary_data)
+      }
+      
+      # Save the workbook
+      saveWorkbook(wb, file, overwrite = TRUE)
+    }
+  )
+
+  # Update download handler for optimized plan
+  output$download_optimized_plan <- downloadHandler(
+    filename = function() {
+      paste("optimized_crossing_plan_", Sys.Date(), ".xlsx", sep = "")
+    },
+    content = function(file) {
+      req(rv$optimization_result)
+      crosses <- rv$optimization_result$crosses
+      
+      if (!is.null(crosses) && nrow(crosses) > 0) {
+        # Join with previous crosses if available
+        if (!is.null(rv$previous_crosses)) {
+          crosses <- crosses %>%
+            left_join(rv$previous_crosses, 
+                     by = c("Female.Parent", "Male.Parent"))
+        }
+        
+        # Add rank column
+        crosses <- crosses %>%
+          mutate(Rank = row_number())
+        
+        writexl::write_xlsx(crosses, path = file)
+      } else {
+        dummy_data <- data.frame(Message = "No optimized crosses available. Please run the optimization first.")
+        writexl::write_xlsx(dummy_data, path = file)
+      }
+    }
+  )
+
+  # Handle ratio displays
+  output$cubicle_ratios <- renderUI({
+    current_cubicles <- cubicles()
+    if (length(current_cubicles) == 0) return(NULL)
+    
+    lapply(current_cubicles, function(cubicle) {
+      female_count <- length(cubicle$crosses$Female.Parent)
+      ratio <- female_count / 1  # 1 male
+      
+      ratio_color <- if (ratio > 3) "red" else "black"
+      
+      div(
+        style = "margin-bottom: 10px;",
+        p(
+          strong("Cubicle ", cubicle$id, ": "),
+          span(
+            style = paste0("color: ", ratio_color, ";"),
+            sprintf("Female to Male Ratio: %.1f:1", ratio)
+          )
+        )
+      )
+    })
+  })
+
+  # Handle print button
+  observeEvent(input$print_layout, {
+    layout_html <- div(
+      h2("Breeding Cubicle Layout"),
+      p("Generated on: ", format(Sys.time(), "%B %d, %Y")),
+      hr(),
+      lapply(cubicles(), function(cubicle) {
+        div(
+          style = "border: 1px solid black; padding: 10px; margin: 10px 0;",
+          h4(paste("Cubicle", cubicle$id)),
+          p(strong("Male: "), cubicle$male),
+          p(strong("Females: "), paste(cubicle$crosses$Female.Parent, collapse = ", ")),
+          p(strong("Notes: "), cubicle$notes)
+        )
+      })
+    )
+    
+    showModal(modalDialog(
+      layout_html,
+      footer = tagList(
+        actionButton("print_now", "Print"),
+        modalButton("Close")
+      ),
+      size = "l"
+    ))
+  })
+
+  observeEvent(input$print_now, {
+    runjs("window.print();")
+  })
+
+  # Enhanced statistics output
+  output$statistics <- renderText({
+    plan_data <- crossing_plan()
+    if (is.null(plan_data)) return("No crossing plan loaded")
+    
+    total_crosses <- nrow(plan_data)
+    assigned_crosses <- sum(plan_data$status == "Assigned")
+    remaining_crosses <- total_crosses - assigned_crosses
+    
+    # Get counts for assigned males and females
+    current_cubicles <- cubicles()
+    
+    # Count occurrences of males and females
+    male_counts <- table(sapply(current_cubicles, function(x) x$male))
+    female_counts <- table(unlist(sapply(current_cubicles, function(x) x$crosses$Female.Parent)))
+    
+    # Format the output
+    male_text <- paste(names(male_counts), "-", male_counts, collapse = "\n")
+    female_text <- paste(names(female_counts), "-", female_counts, collapse = "\n")
+    
+    paste0(
+      "Total Crosses in Plan: ", total_crosses, "\n",
+      "Assigned to Cubicles: ", assigned_crosses, "\n",
+      "Remaining to Assign: ", remaining_crosses, "\n",
+      "Number of Cubicles: ", length(cubicles()), "\n",
+      "Progress: ", round(assigned_crosses/total_crosses * 100, 1), "%\n\n",
+      "Male Usage:\n", male_text, "\n\n",
+      "Female Usage:\n", female_text
+    )
+  })
+
+  # Parent summary table
+  output$parent_summary_table <- renderDT({
+    current_cubicles <- cubicles()
+    
+    if (length(current_cubicles) == 0) {
+      return(NULL)
+    }
+    
+    # Count occurrences
+    male_counts <- table(sapply(current_cubicles, function(x) x$male))
+    female_counts <- table(unlist(sapply(current_cubicles, function(x) x$crosses$Female.Parent)))
+    
+    # Create summary tables
+    male_summary <- data.frame(
+      Parent = names(male_counts),
+      Count = as.numeric(male_counts),
+      Type = "Male",
+      stringsAsFactors = FALSE
+    )
+    
+    female_summary <- data.frame(
+      Parent = names(female_counts),
+      Count = as.numeric(female_counts),
+      Type = "Female",
+      stringsAsFactors = FALSE
+    )
+    
+    # Combine summaries
+    summary_df <- rbind(male_summary, female_summary)
+    
+    datatable(
+      summary_df,
+      options = list(
+        pageLength = 15,
+        dom = 't',
+        ordering = TRUE
+      ),
+      rownames = FALSE
+    )
   })
 }
 
