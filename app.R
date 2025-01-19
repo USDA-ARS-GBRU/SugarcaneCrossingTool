@@ -536,8 +536,8 @@ ui <- dashboardPage(
             helpText(class = "help-text", "2. Click 'Create Cubicle' to group them"),
             helpText(class = "help-text", "3. Track your progress in the summary"),
             
-            dateInput("planting_date", "Planting Date:", value = Sys.Date()),
-            dateInput("expected_flowering", "Expected Flowering:", value = Sys.Date() + 60)
+            dateInput("pollination_date", "Pollination Date:", value = Sys.Date()),
+            dateInput("processing_date", "Processing Date:", value = Sys.Date() + 60)
           )
         ),
         fluidRow(
@@ -978,13 +978,32 @@ server <- function(input, output, session) {
       return()
     }
     
-    # Create new cubicle
+    # Show modal for custom cubicle ID
+    showModal(modalDialog(
+      title = "Create New Cubicle",
+      textInput("custom_cubicle_id", "Enter Cubicle ID (optional)", 
+                value = paste0("C", length(cubicles()) + 1)),
+      footer = tagList(
+        modalButton("Cancel"),
+        actionButton("confirm_cubicle", "Create")
+      )
+    ))
+    
+    # Store selected crosses temporarily
+    rv$temp_selected_crosses <- selected_crosses
+  })
+
+  # Handle cubicle creation confirmation
+  observeEvent(input$confirm_cubicle, {
+    req(rv$temp_selected_crosses)
+    
+    # Create new cubicle with custom or default ID
     new_cubicle <- list(
-      id = paste0("C", length(cubicles()) + 1),
-      male = selected_crosses$Male.Parent[1],
-      crosses = selected_crosses,
-      planting_date = input$planting_date,
-      expected_flowering = input$expected_flowering,
+      id = input$custom_cubicle_id,
+      male = rv$temp_selected_crosses$Male.Parent[1],
+      crosses = rv$temp_selected_crosses,
+      pollination_date = input$pollination_date,
+      processing_date = input$processing_date,
       notes = ""
     )
     
@@ -995,9 +1014,13 @@ server <- function(input, output, session) {
     
     # Update crossing plan status
     plan_data <- crossing_plan()
+    selected_rows <- which(plan_data$Female.Parent %in% rv$temp_selected_crosses$Female.Parent &
+                          plan_data$Male.Parent == rv$temp_selected_crosses$Male.Parent[1])
     plan_data$status[selected_rows] <- "Assigned"
     plan_data$cubicle_id[selected_rows] <- new_cubicle$id
     crossing_plan(plan_data)
+    
+    removeModal()
   })
 
   # Display cubicle table
@@ -1013,8 +1036,8 @@ server <- function(input, output, session) {
         Cubicle_ID = cubicle$id,
         Male = cubicle$male,
         Females = paste(cubicle$crosses$Female.Parent, collapse = ", "),
-        Planting_Date = format(cubicle$planting_date, "%Y-%m-%d"),
-        Expected_Flowering = format(cubicle$expected_flowering, "%Y-%m-%d"),
+        Pollination_Date = format(cubicle$pollination_date, "%Y-%m-%d"),
+        Processing_Date = format(cubicle$processing_date, "%Y-%m-%d"),
         Notes = cubicle$notes,
         stringsAsFactors = FALSE
       )
