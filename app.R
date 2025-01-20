@@ -26,6 +26,8 @@ library(SimpleMating)
 library(sortable)
 library(shinyjs)
 library(plotly)
+library(openxlsx)  # For Excel file handling
+library(writexl)   # For Excel file writing
 
 
 
@@ -137,7 +139,10 @@ ui <- dashboardPage(
       menuItem("Download Data",
                tabName = "download",
                icon = icon("download")
-      )
+      ),
+      menuItem("Cubicle Manager",
+               tabName = "cubicle",
+               icon = icon("th"))
       )
     ),
 
@@ -515,6 +520,11 @@ ui <- dashboardPage(
       title = "Download Optimized Crossing Plan",
       p("Click the button below to download the optimized crossing plan as an Excel file."),
       downloadButton("download_optimized_plan", "Download Optimized Crossing Plan")
+    ),
+    box(
+      title = "Download Cubicle Management Data",
+      p("Click the button below to download the current cubicle assignments and notes as an Excel file."),
+      downloadButton("download_cubicle_data", "Download Cubicle Data")
     )
   )
 ),
@@ -554,6 +564,53 @@ ui <- dashboardPage(
           box(
             title = "Optimization Visualization",
             plotlyOutput("optimization_plot")
+          )
+        )
+      ),
+      tabItem(
+        tabName = "cubicle",
+        fluidRow(
+          box(
+            title = "Cubicle Management",
+            width = 12,
+            p("Organize your optimized crosses into breeding cubicles. Each cubicle can contain up to 3 crosses with the same male parent."),
+            actionButton("create_cubicle", "Create Cubicle from Selected Crosses", 
+                        class = "btn btn-primary"),
+            actionButton("print_layout", "Print Layout", 
+                        class = "btn btn-info"),
+            downloadButton("save_data", "Save Layout"),
+            fileInput("load_data", "Load Layout"),
+            hr(),
+            dateInput("pollination_date", "Pollination Date:", value = Sys.Date()),
+            dateInput("processing_date", "Processing Date:", value = Sys.Date() + 60),
+            hr(),
+            helpText("1. Select crosses from the table below"),
+            helpText("2. Click 'Create Cubicle' to group them"),
+            helpText("3. All crosses in a cubicle must share the same male parent"),
+            DTOutput("crossing_table")
+          )
+        ),
+        fluidRow(
+          column(
+            width = 8,
+            box(
+              title = "Current Cubicles",
+              width = NULL,
+              DTOutput("cubicle_table")
+            )
+          ),
+          column(
+            width = 4,
+            box(
+              title = "Statistics",
+              width = NULL,
+              verbatimTextOutput("statistics")
+            ),
+            box(
+              title = "Female to Male Ratios",
+              width = NULL,
+              uiOutput("cubicle_ratios")
+            )
           )
         )
       )
@@ -607,8 +664,19 @@ ui <- dashboardPage(
 server <- function(input, output, session) {
   library(networkD3)
   
+  # Initialize reactive values
+  rv <- reactiveValues(
+    optimization_result = NULL,
+    previous_crosses = NULL,
+    temp_selected_crosses = NULL  # For storing temporarily selected crosses
+  )
+  
   # Initialize optimized_crosses in the global scope
   optimized_crosses <- reactiveVal(list(crosses = data.frame(), plot = NULL))
+  
+  # Add these reactive values for cubicle management
+  crossing_plan <- reactiveVal(NULL)
+  cubicles <- reactiveVal(list())
   
   # Reactive value for selected date
   reactive_date <- reactive({
@@ -619,7 +687,6 @@ server <- function(input, output, session) {
   dataSource <- reactiveVal()
   
   # Reactive values for selected columns in performance tab
-  rv <- reactiveValues(selectedColumns = NULL)
   rv_trait_scatter <- reactiveValues(selectedColumns = NULL)
 
   # Reactive value for selected clone
@@ -670,18 +737,6 @@ server <- function(input, output, session) {
   })
   # Reactive value for selected cross ID
   reactive_cid <- reactive({as.character(input$crossesid)})
-  
-  # Add reactiveValues for sharing data between modules
-  rv <- reactiveValues(
-    previous_crosses = NULL,
-    recip_previous_crosses=NULL,
-    selectedColumns = NULL
-  )
-  
-  # Add the renderText for dataSourceText
-  output$dataSourceText <- renderText({
-    dataSource()
-  })
   
   # Call the server functions from separate files
   inventory_init <- flowering_server(input, output, session, reactive_date, reactive_iid, dataSource )
@@ -791,12 +846,24 @@ output$female_parents <- renderUI({
       return(list(crosses = data.frame(), plot = NULL))
     })
     
-    # Update the reactive value
-    optimized_crosses(result)
+    # Store the original optimization result
+    rv$optimization_result <- result
     
-    # Display results
+    # Create a copy for cubicle management with additional columns
+    if (!is.null(result$crosses) && nrow(result$crosses) > 0) {
+      cubicle_crosses <- result$crosses
+      cubicle_crosses$status <- "Unassigned"  # Add status column
+      cubicle_crosses$cubicle_id <- NA        # Add cubicle_id column
+      crossing_plan(cubicle_crosses)          # Initialize crossing plan with modified crosses
+      
+      # Show success notification
+      showNotification("Optimization complete. You can now assign crosses to cubicles.", 
+                      type = "message")
+    }
+    
+    # Display optimization results table
     output$optimized_crosses_table <- renderDT({
-      crosses <- optimized_crosses()$crosses
+      crosses <- result$crosses
       if (!is.null(crosses) && nrow(crosses) > 0) {
         # Join with previous crosses if available
         if (!is.null(rv$previous_crosses)) {
@@ -805,7 +872,7 @@ output$female_parents <- renderUI({
                       by = c("Female.Parent", "Male.Parent"))
         }
         
-        #Add rank column
+        # Add rank column
         crosses <- crosses %>%
           mutate(Rank = 1:input$n_crosses)
         
@@ -822,9 +889,11 @@ output$female_parents <- renderUI({
     })
   })
   
-  # Update plot output to use plotly for interactivity
+  # Update the optimization plot to use the original result
   output$optimization_plot <- renderPlotly({
-    plot <- optimized_crosses()$plot
+    req(rv$optimization_result)
+    plot <- rv$optimization_result$plot
+    
     if (!is.null(plot)) {
       # Extract plot data and ensure it has all required columns
       plot_data <- plot$data
@@ -926,6 +995,264 @@ output$female_parents <- renderUI({
     # Cleanup code here if needed
   })
 
+  # Update the crossing table render to show optimization results
+  output$crossing_table <- renderDT({
+    req(crossing_plan())
+    crosses_data <- crossing_plan()
+    
+    if (is.null(crosses_data) || nrow(crosses_data) == 0) {
+      return(datatable(
+        data.frame(Message = "No crosses available. Please run optimization first."),
+        options = list(pageLength = 10)
+      ))
+    }
+    
+    datatable(
+      crosses_data,
+      selection = 'multiple',
+      options = list(
+        pageLength = 10,
+        searching = TRUE,
+        ordering = TRUE
+      )
+    )
+  })
+
+  # Create new cubicle
+  observeEvent(input$create_cubicle, {
+    req(crossing_plan())
+    selected_rows <- input$crossing_table_rows_selected
+    
+    if (length(selected_rows) == 0) {
+      showNotification(
+        "Please select crosses first",
+        type = "warning",  # Changed from "error" to "warning"
+        duration = 5
+      )
+      return()
+    }
+    
+    selected_crosses <- crossing_plan()[selected_rows, ]
+    
+    # Check if all selected crosses have the same male parent
+    if (length(unique(selected_crosses$Male.Parent)) > 1) {
+      showNotification(
+        "All selected crosses must have the same male parent",
+        type = "warning",  # Changed from "error" to "warning"
+        duration = 5
+      )
+      return()
+    }
+    
+    # Show modal for custom cubicle ID
+    showModal(modalDialog(
+      title = "Create New Cubicle",
+      textInput("custom_cubicle_id", "Enter Cubicle ID (optional)", 
+                value = paste0("C", length(cubicles()) + 1)),
+      footer = tagList(
+        modalButton("Cancel"),
+        actionButton("confirm_cubicle", "Create")
+      )
+    ))
+    
+    # Store selected crosses temporarily
+    rv$temp_selected_crosses <- selected_crosses
+  })
+
+  # Handle cubicle creation confirmation
+  observeEvent(input$confirm_cubicle, {
+    req(rv$temp_selected_crosses)
+    req(input$pollination_date)
+    req(input$processing_date)
+    req(input$custom_cubicle_id)
+    
+    # Create new cubicle with custom or default ID
+    new_cubicle <- list(
+      id = input$custom_cubicle_id,
+      male = rv$temp_selected_crosses$Male.Parent[1],
+      crosses = rv$temp_selected_crosses,
+      pollination_date = input$pollination_date,
+      processing_date = input$processing_date,
+      notes = ""
+    )
+    
+    # Update cubicles
+    current_cubicles <- cubicles()
+    current_cubicles[[length(current_cubicles) + 1]] <- new_cubicle
+    cubicles(current_cubicles)
+    
+    # Update crossing plan status
+    plan_data <- crossing_plan()
+    selected_rows <- which(plan_data$Female.Parent %in% rv$temp_selected_crosses$Female.Parent &
+                          plan_data$Male.Parent == rv$temp_selected_crosses$Male.Parent[1])
+    plan_data$status[selected_rows] <- "Assigned"
+    plan_data$cubicle_id[selected_rows] <- new_cubicle$id
+    crossing_plan(plan_data)
+    
+    # Clear temporary storage
+    rv$temp_selected_crosses <- NULL
+    
+    # Remove the modal
+    removeModal()
+    
+    # Show success notification
+    showNotification(
+      "Cubicle created successfully!",
+      type = "message",  # Changed from "success" to "message"
+      duration = 5
+    )
+  })
+
+  # Display cubicle table
+  output$cubicle_table <- renderDT({
+    current_cubicles <- cubicles()
+    
+    if (length(current_cubicles) == 0) {
+      return(NULL)
+    }
+    
+    cubicle_df <- do.call(rbind, lapply(current_cubicles, function(cubicle) {
+      data.frame(
+        Cubicle_ID = cubicle$id,
+        Male = cubicle$male,
+        Females = paste(cubicle$crosses$Female.Parent, collapse = ", "),
+        Pollination_Date = format(as.Date(cubicle$pollination_date), "%Y-%m-%d"),
+        Processing_Date = format(as.Date(cubicle$processing_date), "%Y-%m-%d"),
+        Notes = cubicle$notes,
+        stringsAsFactors = FALSE
+      )
+    }))
+    
+    datatable(
+      cubicle_df,
+      editable = list(target = "cell", disable = list(columns = c(1:5))),  # Only allow editing Notes column
+      options = list(
+        pageLength = 10,
+        dom = 'Bfrtip',
+        buttons = c('copy', 'csv', 'excel')
+      )
+    )
+  })
+
+  # Handle ratio displays
+  output$cubicle_ratios <- renderUI({
+    current_cubicles <- cubicles()
+    if (length(current_cubicles) == 0) return(NULL)
+    
+    lapply(current_cubicles, function(cubicle) {
+      female_count <- length(cubicle$crosses$Female.Parent)
+      ratio <- female_count / 1  # 1 male
+      
+      ratio_color <- if (ratio > 3) "red" else "black"
+      
+      div(
+        style = "margin-bottom: 10px;",
+        p(
+          strong("Cubicle ", cubicle$id, ": "),
+          span(
+            style = paste0("color: ", ratio_color, ";"),
+            sprintf("Female to Male Ratio: %.1f:1", ratio)
+          )
+        )
+      )
+    })
+  })
+
+  # Enhanced statistics output
+  output$statistics <- renderText({
+    plan_data <- crossing_plan()
+    if (is.null(plan_data)) return("No crossing plan loaded. Please run optimization first.")
+    
+    total_crosses <- nrow(plan_data)
+    assigned_crosses <- sum(plan_data$status == "Assigned", na.rm = TRUE)
+    remaining_crosses <- total_crosses - assigned_crosses
+    
+    current_cubicles <- cubicles()
+    
+    # Check if there are any cubicles before calculating counts
+    if (length(current_cubicles) == 0) {
+      return(paste0(
+        "Total Crosses in Plan: ", total_crosses, "\n",
+        "No cubicles created yet."
+      ))
+    }
+    
+    # Safely calculate counts
+    male_counts <- tryCatch({
+      table(sapply(current_cubicles, function(x) x$male))
+    }, error = function(e) NULL)
+    
+    female_counts <- tryCatch({
+      table(unlist(sapply(current_cubicles, function(x) x$crosses$Female.Parent)))
+    }, error = function(e) NULL)
+    
+    # Format the output safely
+    male_text <- if (!is.null(male_counts)) paste(names(male_counts), "-", male_counts, collapse = "\n") else "None"
+    female_text <- if (!is.null(female_counts)) paste(names(female_counts), "-", female_counts, collapse = "\n") else "None"
+    
+    paste0(
+      "Total Crosses in Plan: ", total_crosses, "\n",
+      "Assigned to Cubicles: ", assigned_crosses, "\n",
+      "Remaining to Assign: ", remaining_crosses, "\n",
+      "Number of Cubicles: ", length(cubicles()), "\n",
+      "Progress: ", round(assigned_crosses/total_crosses * 100, 1), "%\n\n",
+      "Male Usage:\n", male_text, "\n\n",
+      "Female Usage:\n", female_text
+    )
+  })
+
+  # Add this observer after the cubicle_table output
+  observeEvent(input$cubicle_table_cell_edit, {
+    info <- input$cubicle_table_cell_edit
+    i <- info$row
+    j <- info$col
+    v <- info$value
+    
+    # Get current cubicles
+    current_cubicles <- cubicles()
+    
+    # Update the notes field for the specific cubicle
+    if (j == 6) {  # 6 is the Notes column
+      current_cubicles[[i]]$notes <- v
+      cubicles(current_cubicles)
+    }
+  })
+
+  # Add this handler for downloading cubicle data
+  output$download_cubicle_data <- downloadHandler(
+    filename = function() {
+      paste("cubicle_management_", format(Sys.Date(), "%Y-%m-%d"), ".xlsx", sep = "")
+    },
+    content = function(file) {
+      current_cubicles <- cubicles()
+      
+      if (length(current_cubicles) == 0) {
+        # If no cubicles exist, create a dummy dataframe with a message
+        dummy_data <- data.frame(Message = "No cubicle data available")
+        writexl::write_xlsx(dummy_data, path = file)
+      } else {
+        # Create a detailed dataframe for export
+        cubicle_data <- do.call(rbind, lapply(seq_along(current_cubicles), function(i) {
+          cubicle <- current_cubicles[[i]]
+          crosses <- cubicle$crosses
+          
+          data.frame(
+            Cubicle_ID = cubicle$id,
+            Male_Parent = cubicle$male,
+            Female_Parent = crosses$Female.Parent,
+            Selection_Index = crosses$Selection.Index,
+            Kinship = crosses$Kinship,
+            Pollination_Date = format(as.Date(cubicle$pollination_date), "%Y-%m-%d"),
+            Processing_Date = format(as.Date(cubicle$processing_date), "%Y-%m-%d"),
+            Notes = cubicle$notes,
+            stringsAsFactors = FALSE
+          )
+        }))
+        
+        writexl::write_xlsx(cubicle_data, path = file)
+      }
+    }
+  )
 }
 
 # Run the Shiny app
