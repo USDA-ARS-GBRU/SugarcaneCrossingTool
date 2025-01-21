@@ -664,6 +664,12 @@ ui <- dashboardPage(
 server <- function(input, output, session) {
   library(networkD3)
   
+  # Add these diagnostic prints
+  print("Checking parent_amat:")
+  print(dim(parent_amat))
+  print("First few rownames:")
+  print(head(rownames(parent_amat)))
+  
   # Initialize reactive values
   rv <- reactiveValues(
     optimization_result = NULL,
@@ -1253,6 +1259,169 @@ output$female_parents <- renderUI({
       }
     }
   )
+
+  # Update the pedigree matrix section in the server
+  output$pedigreeMatrix <- renderPlotly({
+    req(input$makepedigree)
+    
+    # Get current inventory assignments
+    male_parents <- unique(input$male_list)
+    female_parents <- unique(input$female_list)
+    all_parents <- unique(c(male_parents, female_parents))
+    
+    # Add validation and debugging
+    validate(
+      need(length(all_parents) > 0, "Please sort parents first"),
+      need(!is.null(parent_amat), "Relationship matrix not loaded"),
+      need(any(all_parents %in% rownames(parent_amat)), "No matching parents found in relationship matrix")
+    )
+    
+    # Debug print matrix values
+    print("Matrix subsetting debug:")
+    
+    # Subset the relationship matrix for only the flowering parents
+    tryCatch({
+      # Find indices of flowering parents in the full matrix
+      parent_indices <- match(all_parents, rownames(parent_amat))
+      parent_indices <- parent_indices[!is.na(parent_indices)]
+      
+      # Subset the matrix
+      if (length(parent_indices) > 0) {
+        sub_matrix <- parent_amat[parent_indices, parent_indices]
+        
+        # Debug print
+        print("Matrix dimensions:")
+        print(dim(sub_matrix))
+        print("Sample of matrix values:")
+        print(head(head(sub_matrix)))
+        
+        # Create custom color scale
+        colors <- colorRampPalette(c("#FFFFFF", "#FF0000"))(100)
+        
+        # Create heatmap with explicit formatting
+        p <- plot_ly(
+          x = rownames(sub_matrix),
+          y = colnames(sub_matrix),
+          z = as.matrix(sub_matrix),  # Ensure matrix format
+          type = "heatmap",
+          colors = colors,
+          hoverongaps = FALSE,
+          hovertemplate = paste(
+            "Parent 1: %{y}<br>",
+            "Parent 2: %{x}<br>",
+            "Relationship: %{z:.3f}<br>",
+            "<extra></extra>"
+          )
+        ) %>%
+          layout(
+            title = list(
+              text = "Relationship Matrix",
+              font = list(size = 16)
+            ),
+            xaxis = list(
+              title = "",
+              tickangle = 45,
+              tickfont = list(size = 10),
+              showgrid = FALSE
+            ),
+            yaxis = list(
+              title = "",
+              tickfont = list(size = 10),
+              showgrid = FALSE
+            ),
+            margin = list(
+              l = 100,
+              r = 50,
+              b = 100,
+              t = 50,
+              pad = 4
+            )
+          )
+        
+        return(p)
+      } else {
+        validate("No matching parents found in relationship matrix")
+      }
+    }, error = function(e) {
+      print(paste("Error in matrix calculation:", e$message))
+      showNotification(paste("Error in matrix calculation:", e$message), type = "error")
+      return(NULL)
+    })
+  })
+
+  # Update the performance data pulling logic
+  performance_server <- function(input, output, session, reactive_iid, rv, rv_trait_scatter, inventory_init, clone_assignments) {
+    performance_data <- eventReactive(input$makeperformance, {
+      withProgress(message = "Pulling Performance Data", {
+        # Get current inventory assignments
+        male_parents <- unique(input$male_list)
+        female_parents <- unique(input$female_list)
+        all_parents <- unique(c(male_parents, female_parents))
+        
+        validate(
+          need(length(all_parents) > 0, "Please sort parents first")
+        )
+        
+        # Create chunks of 50 clones each to avoid timeout
+        clone_chunks <- split(all_parents, ceiling(seq_along(all_parents)/50))
+        
+        # Initialize empty list for results
+        all_results <- list()
+        
+        # Process each chunk
+        for(chunk in clone_chunks) {
+          tryCatch({
+            chunk_data <- ba_germplasm_attributes(
+              con = brap,
+              germplasmDbId = chunk,
+              attributeList = c("Brix", "Weight", "Height"),
+              rclass = "data.frame"
+            )
+            all_results[[length(all_results) + 1]] <- chunk_data
+          }, error = function(e) {
+            showNotification(paste("Error processing chunk:", e$message), type = "warning")
+          })
+          Sys.sleep(0.5)  # Add small delay to prevent overloading
+        }
+        
+        # Combine all results
+        combined_data <- do.call(rbind, all_results)
+        return(combined_data)
+      })
+    })
+    
+    # Rest of the performance server code...
+  }
+
+  # Update the crosses filtering logic
+  crosses_server <- function(input, output, session, reactive_cid, inventory_init, clone_assignments, rv) {
+    crosses_data <- eventReactive(input$makecrosses, {
+      withProgress(message = "Pulling Crosses Data", {
+        # Get current inventory assignments
+        male_parents <- unique(input$male_list)
+        female_parents <- unique(input$female_list)
+        
+        validate(
+          need(length(male_parents) > 0 && length(female_parents) > 0, 
+               "Please sort both male and female parents first")
+        )
+        
+        # Get all previous crosses
+        all_crosses <- ba_crosses_table(con = brap2, crossingProjectDbId = reactive_cid())
+        
+        # Filter crosses where both parents are currently flowering
+        filtered_crosses <- all_crosses %>%
+          filter(
+            parent1Name %in% female_parents & 
+            parent2Name %in% male_parents
+          )
+        
+        return(filtered_crosses)
+      })
+    })
+    
+    # Rest of the crosses server code...
+  }
 }
 
 # Run the Shiny app
