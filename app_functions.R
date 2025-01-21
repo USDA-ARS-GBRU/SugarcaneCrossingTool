@@ -41,76 +41,86 @@ InitCrossTable <- function(cross_list, Cross.Name="Cross.Unique.ID", Female.Pare
       return(data.frame())
     }
     
-
-    if(ncol(cross_list) < 2) {
-      warning("cross_list has insufficient columns")
-      return(data.frame())
+    # Debug print
+    print("Cross list columns:")
+    print(colnames(cross_list))
+    print("Number of rows in cross_list:")
+    print(nrow(cross_list))
+    print("Available germplasm:")
+    print(head(germplasm$Clone))
+    
+    # Create a working copy of the cross list
+    cross_list2 <- cross_list
+    
+    # Handle new crosses format
+    if(new_crosses) {
+      # Rename columns for new crosses format
+      if("data.parent1.germplasmName" %in% colnames(cross_list2) && 
+         "data.parent2.germplasmName" %in% colnames(cross_list2)) {
+        cross_list2$Female.Parent <- cross_list2$data.parent1.germplasmName
+        cross_list2$Male.Parent <- cross_list2$data.parent2.germplasmName
+        cross_list2$Cross.Unique.ID <- cross_list2$data.crossName
+        cross_list2$Number.of.Progenies <- 0  # Default for new crosses
+      } else {
+        warning("Expected columns not found in new crosses format")
+        return(data.frame())
+      }
     }
     
-    #filter first! goes faster
-    cross_list2 <- cross_list[which(cross_list[["Female.Parent"]] %in% germplasm$Clone & 
-                                   cross_list[["Male.Parent"]] %in% germplasm$Clone), ]
+    # Filter crosses
+    filtered_crosses <- cross_list2[which(
+      cross_list2[[Female.Parent]] %in% germplasm$Clone & 
+      cross_list2[[Male.Parent]] %in% germplasm$Clone
+    ), ]
     
+    print("Rows after filtering:")
+    print(nrow(filtered_crosses))
     
-    
-    if(nrow(cross_list2) == 0) {
+    if(nrow(filtered_crosses) == 0) {
       warning("No matching crosses found after filtering")
-      return(data.frame())
+      return(data.frame(
+        Female.Parent = character(),
+        Male.Parent = character(),
+        Cross.Names = character(),
+        Total.Number.of.Progenies = numeric(),
+        Number.of.Crosses = numeric(),
+        stringsAsFactors = FALSE
+      ))
     }
     
-    ##seedlots are causing a problem
-    # if(new_crosses == FALSE) {
-    #   ### get seedlot information
-    #   tryCatch({
-    #     cross_names <- gsub("^crossName=|&$", "", 
-    #                        paste(paste0("crossName=",
-    #                                   cross_list2[["Cross.Unique.ID"]], "&"),
-    #                              collapse=""))
-    #     
-    #     seeds <- brapi::ba_seedlots_details(
-    #       con = brap2, 
-    #       crossName = cross_names, 
-    #       rclass = "data.frame"
-    #     )
-    #     
-    #     if(!is.data.frame(seeds) || nrow(seeds) == 0) {
-    #       warning("No seedlot data returned")
-    #       return(data.frame())
-    #     }
-    #     
-    #     seeds$data.amount <- as.numeric(as.character(seeds$data.amount))
-    #     seeds[["Cross.Name"]] <- gsub("SL-", "", seeds$data.seedLotName)
-    #     
-    #     #join with subset cross list
-    #     cross_list2 <- cross_list2 %>% 
-    #       left_join(seeds, by = "Cross.Name")
-    #     
-    #   }, error = function(e) {
-    #     warning(paste("Error getting seedlot details:", e$message))
-    #     return(data.frame())
-    #   })
-    # }
-    
-    cross_table<-as.data.frame(aggregate(Cross.Unique.ID ~ Female.Parent + Male.Parent, FUN = c, data = cross_list2)) %>% 
-      left_join(as.data.frame(aggregate(Number.of.Progenies ~ Female.Parent + Male.Parent, FUN = sum, data = cross_list2))) 
-   # %>% left_join(  as.data.frame(aggregate(data.amount ~ Female.Parent + Male.Parent, FUN = sum, data = cross_list2)))
-    
-    cross_table$total.crosses<-apply(cross_table, 1, function(x) {length(x$Cross.Unique.ID)})
-    
-    #cleanup
-   #colnames(cross_table)<-c("Female.Parent", "Male.Parent", "Cross.Names", "Total.Number.of.Progenies", "Seed.Quantity.grams", "Number.of.Crosses")    
-    
-    colnames(cross_table)<-c("Female.Parent", "Male.Parent", "Cross.Names", "Total.Number.of.Progenies", "Number.of.Crosses")    
+    # Create cross table
+    cross_table <- tryCatch({
+      # Group by female and male parents
+      result <- filtered_crosses %>%
+        group_by(!!sym(Female.Parent), !!sym(Male.Parent)) %>%
+        summarise(
+          Cross.Names = list(unique(!!sym(Cross.Name))),
+          Total.Number.of.Progenies = sum(Number.of.Progenies, na.rm = TRUE),
+          .groups = 'drop'
+        ) %>%
+        mutate(
+          Number.of.Crosses = sapply(Cross.Names, length)
+        )
+      
+      as.data.frame(result)
+    }, error = function(e) {
+      warning(paste("Error creating cross table:", e$message))
+      return(data.frame())
+    })
     
     return(cross_table)
     
-    
-    
   }, error = function(e) {
     warning(paste("Error in InitCrossTable:", e$message))
-    return(data.frame())
+    return(data.frame(
+      Female.Parent = character(),
+      Male.Parent = character(),
+      Cross.Names = character(),
+      Total.Number.of.Progenies = numeric(),
+      Number.of.Crosses = numeric(),
+      stringsAsFactors = FALSE
+    ))
   })
-
 }
 
 createPedigreeGraph <- function(data, selected_clone_id = NULL) {

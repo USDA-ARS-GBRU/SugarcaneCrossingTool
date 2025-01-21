@@ -520,6 +520,11 @@ ui <- dashboardPage(
       title = "Download Optimized Crossing Plan",
       p("Click the button below to download the optimized crossing plan as an Excel file."),
       downloadButton("download_optimized_plan", "Download Optimized Crossing Plan")
+    ),
+    box(
+      title = "Download Cubicle Management Data",
+      p("Click the button below to download the current cubicle assignments and notes as an Excel file."),
+      downloadButton("download_cubicle_data", "Download Cubicle Data")
     )
   )
 ),
@@ -1027,7 +1032,7 @@ output$female_parents <- renderUI({
     if (length(selected_rows) == 0) {
       showNotification(
         "Please select crosses first",
-        type = "warning",  # Changed from "error" to "warning"
+        type = "warning",  
         duration = 5
       )
       return()
@@ -1218,6 +1223,45 @@ output$female_parents <- renderUI({
       cubicles(current_cubicles)
     }
   })
+
+  # Add this handler:
+  output$download_cubicle_data <- downloadHandler(
+    filename = function() {
+      paste("cubicle_management_", format(Sys.Date(), "%Y%m%d"), ".xlsx", sep = "")
+    },
+    content = function(file) {
+      current_cubicles <- cubicles()
+      
+      if (length(current_cubicles) == 0) {
+        # Create empty dataframe with column headers if no cubicles exist
+        cubicle_df <- data.frame(
+          Cubicle_ID = character(),
+          Male = character(),
+          Females = character(),
+          Pollination_Date = character(),
+          Processing_Date = character(),
+          Notes = character(),
+          stringsAsFactors = FALSE
+        )
+      } else {
+        # Convert cubicles data to dataframe
+        cubicle_df <- do.call(rbind, lapply(current_cubicles, function(cubicle) {
+          data.frame(
+            Cubicle_ID = cubicle$id,
+            Male = cubicle$male,
+            Females = paste(cubicle$crosses$Female.Parent, collapse = ", "),
+            Pollination_Date = format(as.Date(cubicle$pollination_date), "%Y-%m-%d"),
+            Processing_Date = format(as.Date(cubicle$processing_date), "%Y-%m-%d"),
+            Notes = cubicle$notes,
+            stringsAsFactors = FALSE
+          )
+        }))
+      }
+      
+      # Write to Excel file
+      writexl::write_xlsx(cubicle_df, path = file)
+    }
+  )
 }
 
 # Run the Shiny app
