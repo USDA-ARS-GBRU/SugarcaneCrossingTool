@@ -6,7 +6,7 @@ A Shiny application for managing sugarcane breeding crosses, powered by BrAPI an
 ## Authors
 
 ### Lead Developers
--**Keo Corak**
+- **Keo Corak**
   - USDA-ARS GBRU
   - GitHub: [keocorak](https://github.com/keocorak)
     
