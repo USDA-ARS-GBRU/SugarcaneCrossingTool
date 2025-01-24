@@ -48,6 +48,8 @@ source("modules/pedigree.R")
 source("modules/performance.R")
 source("modules/crosses.R")
 source("modules/download_page.R")
+source("modules/optimization.R")
+source("modules/cubicle.R")
 
 
 ## THEME
@@ -1262,6 +1264,12 @@ output$female_parents <- renderUI({
       writexl::write_xlsx(cubicle_df, path = file)
     }
   )
+
+  # Call optimization server
+  optimization_server(input, output, session, crossing_plan, inventory_init)
+  
+  # Call cubicle server
+  cubicle_server(input, output, session, crossing_plan)
 }
 
 # Run the Shiny app
