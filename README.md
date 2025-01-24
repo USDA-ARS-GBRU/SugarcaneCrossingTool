@@ -3,6 +3,22 @@
 
 A Shiny application for managing sugarcane breeding crosses, powered by BrAPI and BreedBase.
 
+## Authors
+
+### Lead Developers
+-**Keo Corak**
+  - USDA-ARS GBRU
+  - GitHub: [keocorak](https://github.com/keocorak)
+    
+- **Romil Shah** 
+  - North Carolina State University
+  - Email: rmshah3@ncsu.edu
+  - GitHub: [romil2807](https://github.com/romil2807)
+
+### Collaborators
+We thank all contributors who have participated in this project. Special thanks to:
+- USDA-ARS Genomics and Bioinformatics Research Unit (GBRU)
+
 ## Overview
 
 The Sugarcane Crossing Tool (SCT) helps breeders manage and optimize their crossing programs by:
