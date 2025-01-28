@@ -117,7 +117,7 @@ Contributions are welcome! Please:
 
 ## License
 
-MIT
+GNU-GPL3
 
 ## Support
 
