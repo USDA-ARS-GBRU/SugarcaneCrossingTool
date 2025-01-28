@@ -117,11 +117,11 @@ Contributions are welcome! Please:
 
 ## License
 
-[Add your license information here]
+MIT
 
 ## Support
 
-[Add support contact information here]
+Address questions via github issues page or by contacting keo.corak at usda.gov
 
 ## Acknowledgments
 
