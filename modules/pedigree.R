@@ -60,15 +60,32 @@ pedigree_server <- function(input, output, session, reactive_iid, selectedClone,
 
   deeppedigree_init <- eventReactive(input$selectedClone, {
     tryCatch({
-      req(input$selectedClone, inventory_init())
+      req(input$selectedClone)
+      
+      # Get pedigree data
       germplasm <- as.data.frame(rbind(inventory_init()$male, inventory_init()$female))
-      germplasm <- germplasm[duplicated(germplasm$Clone) == FALSE, ]
-
-      tmp <- jsonlite::fromJSON(ba_germplasm_pedigree(con = brap2, germplasmDbId = as.character(germplasm[which(germplasm$Clone == input$selectedClone), 2]), rclass = "json"))$result$data
-
-      print("Structure of tmp:")
-      print(str(tmp))
-
+      clone_id <- germplasm[which(germplasm$Clone == input$selectedClone), "germplasmDbId"]
+      
+      if (length(clone_id) == 0) {
+        showNotification("Selected clone not found in inventory", type = "warning")
+        return(NULL)
+      }
+      
+      tmp <- jsonlite::fromJSON(
+        ba_germplasm_pedigree(
+          con = brap2, 
+          germplasmDbId = as.character(clone_id), 
+          rclass = "json"
+        )
+      )$result$data
+      
+      # Validate pedigree data
+      if (is.null(tmp) || nrow(tmp) == 0 || 
+          (is.list(tmp$parents) && length(tmp$parents[[1]]) == 0)) {
+        showNotification("No pedigree data available for selected clone", type = "warning")
+        return(NULL)
+      }
+      
       return(tmp)
     }, error = function(e) {
       showNotification(paste("Error getting detailed pedigree:", e$message), type = "error")
@@ -77,31 +94,75 @@ pedigree_server <- function(input, output, session, reactive_iid, selectedClone,
   })
 
   pedmatrix_init <- eventReactive(input$makepedigree, {
-
     tryCatch({
       req(input$male_list, input$female_list)
       germplasm <- as.data.frame(rbind(inventory_init()$male, inventory_init()$female))
       germplasm <- germplasm[duplicated(germplasm$Clone) == FALSE, ]
 
-      mat <- PedMatrix(pedigree_download)
+      # Add validation checks
+      if (length(input$male_list) == 0 || length(input$female_list) == 0) {
+        showNotification("Please select both male and female parents", type = "warning")
+        return(data.frame())
+      }
 
-      #get rid of this for now
-      # if ("LCP85-0384" %in% germplasm$Clone) {
-      #   axis <- germplasm$Clone
-      # } else {
-      #   axis <- c(germplasm$Clone, "LCP85-0384")
-      # }
-      
-      mat2 <- round(mat[input$male_list,input$female_list ], 2)
-      mat2 <- as.data.frame(mat2)
-      mat2$Clone <- rownames(mat2)
-      mat2 <- mat2[, c(dim(mat2)[2], 1:dim(mat2)[2] - 1)]
+      # Create relationship matrix with error handling
+      mat <- tryCatch({
+        PedMatrix(pedigree_download)
+      }, error = function(e) {
+        showNotification(paste("Error creating relationship matrix:", e$message), type = "error")
+        return(matrix(nrow = 0, ncol = 0))
+      })
+
+      if (nrow(mat) == 0) {
+        return(data.frame())
+      }
+
+      # Check if selected parents exist in the matrix
+      valid_males <- input$male_list[input$male_list %in% rownames(mat)]
+      valid_females <- input$female_list[input$female_list %in% colnames(mat)]
+
+      if (length(valid_males) == 0 || length(valid_females) == 0) {
+        showNotification("Selected parents not found in pedigree data", type = "warning")
+        return(data.frame())
+      }
+
+      # Filter matrix for selected parents and ensure numeric values
+      mat2 <- tryCatch({
+        # Subset matrix using only valid parents
+        result <- round(as.numeric(mat[valid_males, valid_females]), 2)
+        
+        # Convert to data frame and add Clone column
+        if (length(valid_males) == 1 || length(valid_females) == 1) {
+          # Handle case when result is a vector
+          result_df <- data.frame(
+            Clone = valid_males,
+            stringsAsFactors = FALSE
+          )
+          result_df[[valid_females[1]]] <- result
+        } else {
+          result_df <- as.data.frame(matrix(
+            result,
+            nrow = length(valid_males),
+            ncol = length(valid_females),
+            dimnames = list(valid_males, valid_females)
+          ))
+          result_df$Clone <- valid_males
+        }
+        
+        # Ensure Clone is first column
+        result_df <- result_df[, c("Clone", setdiff(names(result_df), "Clone"))]
+        
+        result_df
+      }, error = function(e) {
+        showNotification(paste("Error processing relationship matrix:", e$message), type = "error")
+        return(data.frame())
+      })
+
       return(mat2)
     }, error = function(e) {
-      showNotification(paste("Error creating pedigree matrix:", e$message), type = "error")
+      showNotification(paste("Error in pedmatrix_init:", e$message), type = "error")
       return(data.frame())
     })
-
   })
 
   #get rid of this for now - LA secific
@@ -132,10 +193,17 @@ pedigree_server <- function(input, output, session, reactive_iid, selectedClone,
 
   output$pedigreeGraph <- renderVisNetwork({
     tryCatch({
-      req(input$selectedClone, deeppedigree_init())
-      createPedigreeGraph(deeppedigree_init())
+      req(input$selectedClone)
+      pedigree_data <- deeppedigree_init()
+      
+      validate(
+        need(!is.null(pedigree_data), "No pedigree data available for selected clone"),
+        need(nrow(pedigree_data) > 0, "Empty pedigree data returned")
+      )
+      
+      createPedigreeGraph(pedigree_data)
     }, error = function(e) {
-      showNotification("Error displaying pedigree graph", type = "error")
+      showNotification(paste("Error displaying pedigree graph:", e$message), type = "error")
       NULL
     })
   })
@@ -143,9 +211,49 @@ pedigree_server <- function(input, output, session, reactive_iid, selectedClone,
   output$pedigreeMatrix <- renderPlotly({
     tryCatch({
       req(pedmatrix_init())
-      heatmaply(pedmatrix_init(), xlab="Female Parent", ylab="Male Parent")
+      
+      # Validate matrix data
+      matrix_data <- pedmatrix_init()
+      if (nrow(matrix_data) == 0 || ncol(matrix_data) <= 1) {
+        showNotification("No valid relationship data to display", type = "warning")
+        return(plotly_empty())
+      }
+      
+      # Convert data to numeric matrix for heatmap
+      matrix_for_plot <- as.matrix(matrix_data[,-1, drop = FALSE]) # exclude Clone column, preserve matrix structure
+      rownames(matrix_for_plot) <- matrix_data$Clone
+      
+      # Force conversion to numeric and handle any NA values
+      matrix_for_plot <- apply(matrix_for_plot, 2, as.numeric)
+      matrix_for_plot[is.na(matrix_for_plot)] <- 0
+      
+      # Create heatmap using plot_ly
+      plot_ly(
+        x = colnames(matrix_for_plot),
+        y = rownames(matrix_for_plot),
+        z = matrix_for_plot,
+        type = "heatmap",
+        colors = viridis::viridis(100),
+        hoverongaps = FALSE
+      ) %>%
+        layout(
+          title = "Relationship Matrix",
+          xaxis = list(
+            title = "Female Parent",
+            tickangle = 45
+          ),
+          yaxis = list(
+            title = "Male Parent"
+          ),
+          margin = list(
+            l = 100,
+            r = 50,
+            b = 100,
+            t = 50
+          )
+        )
     }, error = function(e) {
-      showNotification("Error displaying pedigree matrix", type = "error")
+      showNotification(paste("Error displaying pedigree matrix:", e$message), type = "error")
       plotly_empty()
     })
   })
