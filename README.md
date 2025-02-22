@@ -67,6 +67,57 @@ The Sugarcane Crossing Tool (SCT) helps breeders manage and optimize their cross
 - Manage male:female ratios
 - Export cubicle layouts
 
+## Dependencies
+
+### Automatic Installation
+
+To install all required packages, run:
+R
+source("requirements.R")
+This will:
+- Install any missing required packages
+- Load all necessary libraries
+- Print installed package versions
+- Update the renv lockfile if renv is being used
+
+### Manual Installation
+
+If you prefer to install packages manually, the following packages are required:
+
+Core Shiny packages:
+- shiny, DT, shinyBS, shinyjs, shinydashboard, shinyWidgets
+
+Data manipulation and analysis:
+- dplyr, tidyr, stringr, reshape2, purrr, magrittr
+
+Visualization:
+- plotly, ggplot2, visNetwork, networkD3, viridis
+
+File handling and data formats:
+- jsonlite, writexl, readxl
+
+Domain specific:
+- brapi, SimpleMating
+
+Utilities:
+- sortable, plyr
+
+### System Requirements
+
+- R version 4.0.0 or higher
+- Internet connection for package installation
+- Write permissions to R library location
+
+### Troubleshooting
+
+If you encounter any issues during package installation:
+1. Check your internet connection
+2. Ensure you have write permissions to your R library location
+3. Check the error message in the console for specific package installation failures
+4. Make sure your R version meets the minimum requirements
+
+For any persistent issues, please check the error messages in the console and consult the package documentation for specific requirements.
+
 ## Installation
 
 ### Prerequisites
