@@ -2,6 +2,20 @@
 **Sugarcane Crossing Tool  (SCT)**
 
 -----------------------------------
+**Authors**
+
+Keo E. Corak 
+[Romil M. Shah](https://github.com/romil2807#contact)
+
+
+**Introduction** 
+
+The Sugarcane Crossing Tool (SCT) is a lightweight RShiny dashboard application designed to receive, process, and visualize data from a linked [BreedBase](https://doi.org/10.1093/g3journal/jkac078) instance. This application is being developed collaboratively with members of the [Sugarcane Integrated Breeding System](https://www.amscl.org/sugarcane-integrated-breeding-system/), who have advocated for an application that assists them in designing crosses based on queried information for a list of available accessions. Modularized code is provided in this GitHub repository for community use. The crossing tool uses a modified version of a previously described [BrAPI implementation in R](https://github.com/CIP-RIU/brapi) to access a compliant database and employs standard R/JavaScript packages to aggregate and visualize data. Modules within the application allow breeders to query information relevant to their decision-making process, such as the number and sex of flowering accessions (since sugarcane flowers have variable male fertility), deep pedigree and relatedness information for each unique flowering accession, summarized trial data, and the prior frequency and success of potential cross combinations. Additionally, a *BETA* module implements a simple cross optimization scheme from the [R package SimpleMating](https://github.com/rramadeu/SimpleMating). 
+
+
+**How to Cite**
+
+Coming soon :) 
 
 **For Breeders Logging into the App** 
 
