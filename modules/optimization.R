@@ -1,8 +1,8 @@
 #Optimization.R
 
-optimization_server <- function(input, output, session, crossing_plan, inventory_init) {
+optimization_server <- function(input, output, session, crossing_plan, inventory_init, rv) {
   
-  # Initialize reactive values for optimization results
+  # # Initialize reactive values for optimization results
   rv <- reactiveValues(
     optimization_result = NULL,
     previous_crosses = NULL
