@@ -314,7 +314,7 @@ optimize_crosses <- function(inventory_data, male_parents, female_parents, n_cro
     
     # Predict mid-parent average
     mpa <- tryCatch({
-      SimpleMating::getMPA(MatePlan = cross_plan,
+      SimpleMating::getMPV(MatePlan = cross_plan,
                           Criterion = blup[,1:4],
                           K = as.matrix(amat),
                           Weights = weights)
