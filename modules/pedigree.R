@@ -33,9 +33,6 @@ pedigree_server <- function(input, output, session, reactive_iid, selectedClone,
         pedigree <- tmp[tmp$data.germplasmName %in% germplasm$Clone, c("data.germplasmName", "data.germplasmDbId", "data.pedigree")] %>%
           dplyr::rename(Clone = data.germplasmName, Pedigree = data.pedigree)
 
-        pedigree <- tmp[tmp$data.germplasmName %in% germplasm$Clone, c("data.germplasmName", "data.germplasmDbId", "data.pedigree")] %>%
-          dplyr::rename(Clone = data.germplasmName, Pedigree = data.pedigree)
-
         #note: could rewrite ba_germplam_progeny to speed performance
         
         for (i in 1:dim(pedigree)[1]) {
@@ -221,11 +218,13 @@ pedigree_server <- function(input, output, session, reactive_iid, selectedClone,
       
       # Convert data to numeric matrix for heatmap
       matrix_for_plot <- as.matrix(matrix_data[,-1, drop = FALSE]) # exclude Clone column, preserve matrix structure
-      rownames(matrix_for_plot) <- matrix_data$Clone
+
       
       # Force conversion to numeric and handle any NA values
       matrix_for_plot <- apply(matrix_for_plot, 2, as.numeric)
       matrix_for_plot[is.na(matrix_for_plot)] <- 0
+      
+      rownames(matrix_for_plot) <- matrix_data$Clone
       
       # Create heatmap using plot_ly
       plot_ly(

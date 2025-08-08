@@ -69,8 +69,8 @@ InitCrossTable <- function(cross_list, Cross.Name="Cross.Unique.ID", Female.Pare
     
     # Filter crosses
     filtered_crosses <- cross_list2[which(
-      cross_list2[[Female.Parent]] %in% germplasm$Clone & 
-      cross_list2[[Male.Parent]] %in% germplasm$Clone
+      cross_list2[["Female.Parent"]] %in% germplasm$Clone & 
+      cross_list2[["Male.Parent"]] %in% germplasm$Clone
     ), ]
     
     print("Rows after filtering:")
@@ -92,13 +92,13 @@ InitCrossTable <- function(cross_list, Cross.Name="Cross.Unique.ID", Female.Pare
     cross_table <- tryCatch({
       # Group by female and male parents
       result <- filtered_crosses %>%
-        group_by(!!sym(Female.Parent), !!sym(Male.Parent)) %>%
-        summarise(
-          Cross.Names = list(unique(!!sym(Cross.Name))),
-          Total.Number.of.Progenies = sum(Number.of.Progenies, na.rm = TRUE),
-          .groups = 'drop'
+        dplyr::group_by(Female.Parent,Male.Parent) %>%
+        dplyr::summarise(
+          Cross.Names = list(unique(Cross.Unique.ID)),
+          Total.Number.of.Progenies = sum(Number.of.Progenies, na.rm = TRUE)
+         # .groups = 'drop'
         ) %>%
-        mutate(
+        dplyr::mutate(
           Number.of.Crosses = sapply(Cross.Names, length)
         )
       
