@@ -1,7 +1,7 @@
 #Crosses.R
 crosses_server <- function(input, output, session, reactive_cid, inventory_init, clone_assignments, rv) {
   
-  crosses_init <- eventReactive(input$makecrosses, {
+  crosses_init <<- eventReactive(input$makecrosses, {
     withProgress(message = "Pulling Cross Data", {
       tryCatch({
         # Add diagnostic logging
