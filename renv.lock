@@ -1,6 +1,6 @@
 {
   "R": {
-    "Version": "4.3.2",
+    "Version": "4.5.0",
     "Repositories": [
       {
         "Name": "CRAN",
@@ -63,10 +63,10 @@
     },
     "Matrix": {
       "Package": "Matrix",
-      "Version": "1.6-5",
+      "Version": "1.7-3",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "8c7115cd3a0e048bda2a7cd110549f7a",
+      "Hash": "fb578c2b5d796882c60e9f770352f7c4",
       "Requirements": [
         "lattice"
       ]
@@ -152,10 +152,10 @@
     },
     "bit": {
       "Package": "bit",
-      "Version": "4.0.5",
+      "Version": "4.6.0",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "d242abec29412ce988848d0294b208fd",
+      "Hash": "ebe86ffd194564abdc895d87742d5a29",
       "Requirements": []
     },
     "bit64": {
@@ -320,10 +320,10 @@
     },
     "cluster": {
       "Package": "cluster",
-      "Version": "2.1.6",
+      "Version": "2.1.8.1",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "0aaa05204035dc43ea0004b9c76611dd",
+      "Hash": "e16d49a008e1a22ee863fb9a51de9bde",
       "Requirements": []
     },
     "codetools": {
@@ -401,10 +401,10 @@
     },
     "data.table": {
       "Package": "data.table",
-      "Version": "1.15.0",
+      "Version": "1.17.8",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "cfbbb4aed6e78cd45f17123a9ec9981a",
+      "Hash": "1d991cd6160fa7b1fdbd3689034cbd15",
       "Requirements": []
     },
     "dbplyr": {
@@ -446,10 +446,10 @@
     },
     "digest": {
       "Package": "digest",
-      "Version": "0.6.34",
+      "Version": "0.6.37",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "7ede2ee9ea8d3edbf1ca84c1e333ad1a",
+      "Hash": "33698c4b3127fc9f506654607fb73676",
       "Requirements": []
     },
     "dplyr": {
@@ -872,10 +872,10 @@
     },
     "igraph": {
       "Package": "igraph",
-      "Version": "2.0.3",
+      "Version": "2.1.4",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "c3b7d801d722e26e4cd888e042bf9af5",
+      "Hash": "db7352c3d239d0a319d2e3d0d040ed16",
       "Requirements": [
         "Matrix",
         "cli",
@@ -1071,10 +1071,10 @@
     },
     "nlme": {
       "Package": "nlme",
-      "Version": "3.1-164",
+      "Version": "3.1-168",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "a623a2239e642806158bc4dc3f51565d",
+      "Hash": "b1d2ea08d5d392831fbc32c872362b06",
       "Requirements": [
         "lattice"
       ]
@@ -1464,10 +1464,10 @@
     },
     "seriation": {
       "Package": "seriation",
-      "Version": "1.5.4",
+      "Version": "1.5.7",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "786c381ec4c40d1425e50ace3fee54bc",
+      "Hash": "9701ad285dcf9ffc66e9c62d65193f4e",
       "Requirements": [
         "MASS",
         "TSP",
@@ -1536,10 +1536,10 @@
     },
     "stringi": {
       "Package": "stringi",
-      "Version": "1.8.3",
+      "Version": "1.8.7",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "058aebddea264f4c99401515182e656a",
+      "Hash": "2b56088e23bdd58f89aebf43a0913457",
       "Requirements": []
     },
     "stringr": {
@@ -1747,10 +1747,10 @@
     },
     "vegan": {
       "Package": "vegan",
-      "Version": "2.6-4",
+      "Version": "2.7-1",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "659fe7589b8e0b16baa49043a61a0ce0",
+      "Hash": "7e18e8e05e178b95c2edea6b85acefe9",
       "Requirements": [
         "MASS",
         "cluster",
