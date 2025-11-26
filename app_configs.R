@@ -12,7 +12,7 @@ parent_amat<-full_amat[rownames(full_amat)%in%pedigree_download$Accession, colna
 ## INIT DB CONNECTION ----------------------
 
 location_iid_map <- list(
-  "Florida" = "3757"
+  "Florida" = "3758"
 )
 
 crosses_iid_map<-list(
