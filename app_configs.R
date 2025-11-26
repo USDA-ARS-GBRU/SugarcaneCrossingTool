@@ -9,11 +9,16 @@ colnames(blup_data)[1]<-"Clone"
 full_amat<-PedMatrix(read.csv("data/2025ParentPedigree_Full.csv"))
 parent_amat<-full_amat[rownames(full_amat)%in%pedigree_download$Accession, colnames(full_amat)%in%pedigree_download$Accession]
 
+
+
 ## INIT DB CONNECTION ----------------------
 
 location_iid_map <- list(
   "Florida" = "3758"
 )
+
+#Blocking vector
+block_vector<-c("1"="West", "2"="East", "3"="Railcarts")
 
 crosses_iid_map<-list(
   "Aliya"="3756"  #needs to be updated each year
