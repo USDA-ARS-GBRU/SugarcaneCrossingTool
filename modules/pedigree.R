@@ -104,7 +104,7 @@ pedigree_server <- function(input, output, session, reactive_iid, selectedClone,
 
       # Create relationship matrix with error handling
       mat <- tryCatch({
-        PedMatrix(pedigree_download)
+        parent_amat
       }, error = function(e) {
         showNotification(paste("Error creating relationship matrix:", e$message), type = "error")
         return(matrix(nrow = 0, ncol = 0))
