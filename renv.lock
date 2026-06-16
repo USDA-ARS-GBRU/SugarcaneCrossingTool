@@ -94,19 +94,20 @@
       "Hash": "6a72e94a8c9be4ef719af3aa3628f2dc",
       "Requirements": []
     },
-    "SimpleMating": {
+   "SimpleMating": {
       "Package": "SimpleMating",
-      "Version": "0.1.1002",
+      "Version": "0.0.9002",
       "Source": "GitHub",
       "RemoteType": "github",
       "RemoteHost": "api.github.com",
       "RemoteRepo": "SimpleMating",
-      "RemoteUsername": "rramadeu",
+      "RemoteUsername": "Resende-Lab",
       "RemoteRef": "HEAD",
-      "RemoteSha": "9962ff727e15a8d6fcc32f8d409d5e561bd4948f",
-      "Hash": "637671c97f142aefe73763691aa9fdcb",
+      "RemoteSha": "ae7a83af86391d79a0deb3eef7a23fb69985c614",
+      "Hash": "c6a5865b22d75feb7216970672397d7c",
       "Requirements": [
-        "dplyr"
+        "AGHmatrix",
+        "ggplot2"
       ]
     },
     "TSP": {
