@@ -14,26 +14,26 @@ parent_amat<-full_amat[rownames(full_amat)%in%pedigree_download$Accession, colna
 ## INIT DB CONNECTION ----------------------
 
 location_iid_map <- list(
-  "Florida" = "3758"
+  "WICSCBS" = "3922"
 )
 
 #Blocking vector
-block_vector<-c("1"="West", "2"="East", "3"="Railcarts")
+block_vector<-c("1"="main")
 
 crosses_iid_map<-list(
-  "Aliya"="3756"  #needs to be updated each year
+  "FL_25"="3940"  #needs to be updated each year
 )
 
 brap <- brapi::as.ba_db(
   secure = FALSE,
   protocol = "https://",
-  db ="sugarcanebase.breedinginsight.net",
+  db =Sys.getenv("URL"),
   port = 80,
   apipath = NULL,
   multicrop = FALSE,
   crop = "",
-  user = "appuser",
-  password = "appuser123",
+  user = Sys.getenv("USERNAME"),
+  password = Sys.getenv("PASS"),
   token = "",
   granttype = "password",
   clientid = "rbrapi",
@@ -44,17 +44,16 @@ brap <- brapi::as.ba_db(
 brap2 <- brapi::as.ba_db(
   secure = FALSE,
   protocol = "https://",
-  db =  "sugarcanebase.breedinginsight.net",
+  db =  Sys.getenv("URL"),
   port = 80,
   apipath = NULL,
   multicrop = FALSE,
   crop = "",
-  user = "appuser",
-  password = "appuser123",
+  user = Sys.getenv("USERNAME"),
+  password = Sys.getenv("PASS"),
   token = "",
   granttype = "password",
   clientid = "rbrapi",
   bms = FALSE,
   version = "v2"
 )
-
