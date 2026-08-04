@@ -193,8 +193,8 @@
       "RemoteUsername": "keocorak",
       "RemotePkgRef": "keocorak/cip-riu-brapi",
       "RemoteRef": "HEAD",
-      "RemoteSha": "093cedc2b7cd76a1c3c0fdb4493f42d8b50bb755",
-      "Hash": "b842c7f77256b863b90e3601017c9351",
+      "RemoteSha": "667597949a17bde4ae293425c385e9984bc59539",
+      "Hash": "22cb5c54d5720bd8acf064c17d254da1",
       "Requirements": [
         "assertthat",
         "curl",

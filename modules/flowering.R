@@ -16,8 +16,13 @@ flowering_server <- function(input, output, session, reactive_date, reactive_iid
       
       inven_merge<-aggregate(as.numeric(value)~germplasmName+germplasmDbId,inven_date, sum) #takes into account possibility of multiple plots of same genotype
       
-      ###working here
-      colnames(inven_merge)<-colnames(female)<-c("Clone", "germplasmDbId", "FlowerCount", "Location")
+      colnames(inven_merge)<-c("Clone", "germplasmDbId", "FlowerCount")
+      
+      #####temp placeholder for sex
+      inven_merge$tempSex<-sample(c("M", "F"), nrow(inven_merge), replace = TRUE)
+      
+      male<-filter(inven_merge, tempSex=="M")
+      female<-filter(inven_merge, tempSex=="F")
       
       inven2<-list(male, female)
       names(inven2)<-c("male", "female")
