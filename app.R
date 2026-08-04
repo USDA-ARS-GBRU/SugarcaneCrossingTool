@@ -59,7 +59,7 @@ source("modules/cubicle.R")
 brapi::ba_check(brap) # should be true, for debugging
 
 brapi::ba_login(brap) #important if database requires login for brapi queries
-
+brapi::ba_login(brap2) 
 # USER INTERFACE  -------------------------------------------------------------
 
 ui <- dashboardPage(
