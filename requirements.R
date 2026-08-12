@@ -30,7 +30,7 @@ required_packages <- c(
   
   # Domain specific
   "brapi",
-  "SimpleMating",
+  #"SimpleMating",
   
   # Utilities
   "sortable",
