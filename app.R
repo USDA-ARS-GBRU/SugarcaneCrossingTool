@@ -398,7 +398,7 @@ ui <- dashboardPage(
               inputId = "makeproperties",
               label = "Get Clone Passport Data"
             ),
-            p("placeholder")
+            p("This table shows you selected passport data for flowering clones")
           ), 
           DTOutput("propertiesTable"),
         )

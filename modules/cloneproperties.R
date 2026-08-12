@@ -25,12 +25,16 @@ properties_server <- function(input, output, session, reactive_iid, inventory_in
           classString = "ba_germplasm_details"
         )
         
-        col_additional_props<-grep("additionalProps", colnames(tmp), value=TRUE )
+        col_additional_props<-grep("additionalProps", colnames(tmp), value=TRUE)
         
-        properties <- tmp[tmp$data.germplasmName %in% germplasm$Clone, c("data.germplasmName", "data.germplasmDbId", "data.pedigree", col_additional_props)] %>%
-          dplyr::rename(Clone = data.germplasmName, Pedigree = data.pedigree)
+        properties <- tmp[tmp$data.germplasmName %in% germplasm$Clone, c("data.germplasmName", "data.germplasmDbId", col_additional_props)] %>%
+          dplyr::rename(Clone = data.germplasmName) %>% 
+          dplyr::select(!data.germplasmDbId)
+        
+       colnames(properties)<-gsub("data.additionalInfo.additionalProps.","", colnames(properties))
         
         return(properties)
+        
       } , error = function(e) {
         showNotification(paste("Error getting property data:", e$message), type = "error", duration = NULL)
         return(data.frame(Clone = character(), Property = character()))
