@@ -50,7 +50,6 @@ source("modules/crosses.R")
 source("modules/download_page.R")
 source("modules/optimization.R")
 source("modules/cubicle.R")
-source("modules/cloneproperties.R")
 
 
 ## THEME
@@ -59,8 +58,6 @@ source("modules/cloneproperties.R")
 ## CHECK if true connection
 brapi::ba_check(brap) # should be true, for debugging
 
-brapi::ba_login(brap) #important if database requires login for brapi queries
-brapi::ba_login(brap2) 
 # USER INTERFACE  -------------------------------------------------------------
 
 ui <- dashboardPage(
@@ -124,10 +121,6 @@ ui <- dashboardPage(
       menuItem("Inventory/Sorting",
                tabName = "flowering",
                icon = icon("seedling")
-      ),
-      menuItem("Clone Properties",
-               tabName = "properties",
-               icon = icon("info")
       ),
       menuItem("Kinship/Pedigree",
                tabName = "kinship",
@@ -385,24 +378,6 @@ ui <- dashboardPage(
 
         
          ))),
-      
-      
-      #### Download tab content ----
-      tabItem(
-        tabName = "properties",
-        fluidRow(
-          box(
-            title="Basic Passport/Accession Property Information",
-            width=12,
-            actionButton(
-              inputId = "makeproperties",
-              label = "Get Clone Passport Data"
-            ),
-            p("This table shows you selected passport data for flowering clones")
-          ), 
-          DTOutput("propertiesTable"),
-        )
-      ),
 
       ### Pedigree tab content ----
 
@@ -767,7 +742,6 @@ server <- function(input, output, session) {
   
   # Call the server functions from separate files
   inventory_init <- flowering_server(input, output, session, reactive_date, reactive_iid, dataSource )
-  properties_server(input, output, session, reactive_iid, inventory_init, clone_assignments)
   pedigree_server(input, output, session, reactive_iid, selectedClone, inventory_init, clone_assignments)
   performance_server(input, output, session, reactive_iid, rv, rv_trait_scatter, inventory_init, clone_assignments)
   crosses_server(input, output, session, reactive_cid, inventory_init, clone_assignments, rv)
