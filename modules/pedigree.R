@@ -25,7 +25,7 @@ pedigree_server <- function(input, output, session, reactive_iid, selectedClone,
         
         tmp <- stripClass(
           as.data.frame(
-            ba_germplasm_details2(con = brap2, germplasmQuery = as.character(paste0("?studyDbId=", reactive_iid(), "&pageSize=2000")), rclass = "data.frame")
+            ba_germplasm_details2(con = brap2, germplasmQuery = as.character(paste0("?studyDbId=", reactive_iid(), "&pageSize=1000")), rclass = "data.frame")
           ),
           classString = "ba_germplasm_details"
         )
@@ -104,7 +104,7 @@ pedigree_server <- function(input, output, session, reactive_iid, selectedClone,
 
       # Create relationship matrix with error handling
       mat <- tryCatch({
-        parent_amat
+        PedMatrix(pedigree_download)
       }, error = function(e) {
         showNotification(paste("Error creating relationship matrix:", e$message), type = "error")
         return(matrix(nrow = 0, ncol = 0))

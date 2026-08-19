@@ -219,60 +219,59 @@ createPedigreeGraph <- function(data, selected_clone_id = NULL) {
   #   return(NULL)
   # }
   } ) 
-}
-
-#duplicated funtion
-# optimize_crosses <- function(inventory_data, male_parents, female_parents, n_crosses, max_crosses_per_parent, culling_k, blup, amat, weights) {
-#  
-# 
-#    # Filter inventory data for selected parents
-#   selected_parents <- c(male_parents, female_parents)
-#   filtered_inventory <- inventory_data[inventory_data$Clone %in% selected_parents, ]
-#   
-#   # Debug print
-#   print("Selected parents:")
-#   print(selected_parents)
-#   
-#   blup<-blup[blup$Clone%in%selected_parents,]
-#   amat<-as.matrix(amat[selected_parents, selected_parents])
-#   
-#   # # Create dummy BLUP values for two traits
-#   # n_parents <- length(selected_parents)
-#   # dummy_blup1 <- rnorm(n_parents)
-#   # dummy_blup2 <- rnorm(n_parents)
-#   # dummy_blups <- data.frame(
-#   #   Clone = selected_parents,
-#   #   Trait1 = dummy_blup1,
-#   #   Trait2 = dummy_blup2
-#   # )
-#   # 
-#   # # Create a dummy relationship matrix
-#   # dummy_K <- matrix(runif(n_parents^2, 0, 1), nrow = n_parents, ncol = n_parents)
-#   # rownames(dummy_K) <- colnames(dummy_K) <- selected_parents
-#   # 
-#   # Create custom crossing plan ensuring females and males are correctly assigned
-#   cross_plan <- SimpleMating::planCross(TargetPop = female_parents, TargetPop2 = male_parents, MateDesign="half")
-#   
-#   # Debug print
-#   print("Cross plan:")
-#   print(head(cross_plan))
-#   print(paste("Number of crosses:", nrow(cross_plan)))
-#   
-#   # Predict mid-parent average
-#   mpa <- tryCatch({
-#     SimpleMating::getMPA(MatePlan = cross_plan,
-#                         Criterion = blup[,1:4],
-#                         K = amat,
-#                         Weights = weights)
-# 
-#   }, error = function(e) {
-#     warning("Error creating pedigree graph:", e$message)
-#     return(NULL)
-#   })
-# 
-# }
+  }
 
 optimize_crosses <- function(inventory_data, male_parents, female_parents, n_crosses, max_crosses_per_parent, culling_k, blup, amat, weights) {
+ 
+
+   # Filter inventory data for selected parents
+  selected_parents <- c(male_parents, female_parents)
+  filtered_inventory <- inventory_data[inventory_data$Clone %in% selected_parents, ]
+  
+  # Debug print
+  print("Selected parents:")
+  print(selected_parents)
+  
+  blup<-blup[blup$Clone%in%selected_parents,]
+  amat<-as.matrix(amat[selected_parents, selected_parents])
+  
+  # # Create dummy BLUP values for two traits
+  # n_parents <- length(selected_parents)
+  # dummy_blup1 <- rnorm(n_parents)
+  # dummy_blup2 <- rnorm(n_parents)
+  # dummy_blups <- data.frame(
+  #   Clone = selected_parents,
+  #   Trait1 = dummy_blup1,
+  #   Trait2 = dummy_blup2
+  # )
+  # 
+  # # Create a dummy relationship matrix
+  # dummy_K <- matrix(runif(n_parents^2, 0, 1), nrow = n_parents, ncol = n_parents)
+  # rownames(dummy_K) <- colnames(dummy_K) <- selected_parents
+  # 
+  # Create custom crossing plan ensuring females and males are correctly assigned
+  cross_plan <- SimpleMating::planCross(TargetPop = female_parents, TargetPop2 = male_parents, MateDesign="half")
+  
+  # Debug print
+  print("Cross plan:")
+  print(head(cross_plan))
+  print(paste("Number of crosses:", nrow(cross_plan)))
+  
+  # Predict mid-parent average
+  mpa <- tryCatch({
+    SimpleMating::getMPA(MatePlan = cross_plan,
+                        Criterion = blup[,1:4],
+                        K = amat,
+                        Weights = weights)
+
+  }, error = function(e) {
+    warning("Error creating pedigree graph:", e$message)
+    return(NULL)
+  })
+
+}
+
+optimize_crosses <- function(inventory_data, male_parents, female_parents, n_crosses, max_crosses_per_parent, culling_k, prop_sel, blup, amat, weights) {
   tryCatch({
     # Validate inputs
     if (length(male_parents) == 0 || length(female_parents) == 0) {
