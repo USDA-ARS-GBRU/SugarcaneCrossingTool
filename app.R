@@ -16,7 +16,6 @@ library(AGHmatrix)
 library(heatmaply)
 library(shinyWidgets)
 library(data.table)
-library(writexl)
 library(tis)
 library(fresh)
 library(networkD3)
@@ -55,15 +54,24 @@ source("modules/cubicle.R")
 ## THEME
 #TBA
 
+## HOME PAGE WORKFLOW STEPS -----
+sct_workflow_steps <- list(
+  list(icon = "map-location-dot", title = "Select Location", desc = "Choose your crossing-block location from the sidebar."),
+  list(icon = "user", title = "Select Breeder", desc = "Choose your breeder login so your crosses stay separate from others at the same location."),
+  list(icon = "calendar-day", title = "Choose A Date", desc = "Pick the inventory date you want to view."),
+  list(icon = "cloud-arrow-down", title = "Get Flower Inventory", desc = "Click the button to pull that day's inventory."),
+  list(icon = "arrow-down-up-across-line", title = "Sort The Inventory", desc = "Head to Inventory/Sorting to drag clones into Female / Male parents.")
+)
+
 ## CHECK if true connection
 brapi::ba_check(brap) # should be true, for debugging
 
 # USER INTERFACE  -------------------------------------------------------------
 
 ui <- dashboardPage(
-  
 
-  title = "STC",
+
+  title = "SCT",
   dark = NULL,
 
   ## CONTROLBAR ----
@@ -75,7 +83,11 @@ ui <- dashboardPage(
 
   ## HEADER --------
   header = dashboardHeader(
-    title = "SCT",
+    title = dashboardBrand(
+      title = tagList(icon("seedling"), "Sugarcane Crossing Tool"),
+      color = "teal"
+    ),
+    status = "teal",
     rightUi = tagList(
       dropdownMenu(
         type = "notifications",
@@ -93,26 +105,32 @@ ui <- dashboardPage(
 
   ## SIDEBAR ------
   sidebar = dashboardSidebar(
-    selectInput("location", "Step 1: Select Location", choices = location_iid_map),
-    
-    #this is kind of confusing. The idea is that multiple breeders might be working at same location (Florida) and they should be able to track crosses independently, even though cane lines are combined
-    #so crossesid refers to crosses a specific breeder is making
-    selectInput("crossesid", "Step 2: Select Breeder", choices=crosses_iid_map), 
-    
-    dateInput(
-      "date",
-      "Step 3: Choose A Date"
-    ),
-    #actionButton("brapipull", "Get Flower Inventory Data"),
-    textOutput("dateWarning"), 
-    
+    width = "270px",
+    skin = "light",
+    status = "teal",
+    div(class = "sidebar-steps",
+      selectInput("location", "Step 1: Select Location", choices = location_iid_map),
 
-    
-    actionButton(
-      "brapipull",
-     strong("Step 4. Get Flower Inventory")
+      #this is kind of confusing. The idea is that multiple breeders might be working at same location (Florida) and they should be able to track crosses independently, even though cane lines are combined
+      #so crossesid refers to crosses a specific breeder is making
+      selectInput("crossesid", "Step 2: Select Breeder", choices=crosses_iid_map),
+
+      dateInput(
+        "date",
+        "Step 3: Choose A Date"
+      ),
+      textOutput("dateWarning"),
+
+      actionButton(
+        "brapipull",
+        tagList(icon("cloud-arrow-down"), " Step 4 · Get Flower Inventory"),
+        class = "btn-cta"
+      ),
+      div(class = "sidebar-hint",
+          icon("circle-info"),
+          " Don't forget to click ", strong("Get Flower Inventory"), " again each time you choose a new date."
+      )
     ),
-    p("Don't forget to push 'Get Flower Inventory", strong("each"), "each time you choose a new date"),
     sidebarMenu(
       menuItem("Home",
                tabName = "home",
@@ -153,116 +171,219 @@ ui <- dashboardPage(
   body = dashboardBody(
     useShinyjs(),
     tags$head(
+      tags$link(rel = "stylesheet", href = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"),
       tags$style(HTML("
-        .rank-list-container .rank-list-item {
-          color: #333;
-          background-color: #f8f9fa;
-        }
-        .dark-mode .rank-list-container .rank-list-item {
-          color: #f8f9fa;
-          background-color: #343a40;
-        }
-        /* Updated styles for sidebar elements */
-        .dark-mode .main-sidebar {
-          background-color: #343a40 !important;
-        }
-        .dark-mode .main-sidebar .nav-sidebar .nav-item .nav-link,
-        .dark-mode .main-sidebar .nav-sidebar .nav-item .nav-link p,
-        .dark-mode .main-sidebar .brand-text,
-        .dark-mode .main-sidebar .user-panel .info,
-        .dark-mode .sidebar .form-group label,
-        .dark-mode .sidebar p,
-        .dark-mode .sidebar .btn-default,
-        .dark-mode .sidebar .form-control,
-        .dark-mode .sidebar .input-group-text,
-        .dark-mode .sidebar .selectize-input,
-        .dark-mode .sidebar .selectize-dropdown {
-          color: #f8f9fa !important;
-        }
-        .dark-mode .sidebar .form-control,
-        .dark-mode .sidebar .input-group-text,
-        .dark-mode .sidebar .selectize-input,
-        .dark-mode .sidebar .selectize-dropdown {
-          background-color: #454d55 !important;
-          border-color: #6c757d !important;
-        }
-        .dark-mode .sidebar .btn-default {
-          background-color: #454d55 !important;
-          border-color: #6c757d !important;
-        }
-        .dark-mode .sidebar .btn-default:hover {
-          background-color: #5a6268 !important;
-        }
-        /* Styles for optimized crossing plan */
-        .dark-mode .box-body {
-          color: #f8f9fa !important;
-        }
-        .dark-mode .dataTables_wrapper {
-          color: #f8f9fa !important;
-        }
-        .dark-mode .dataTables_wrapper .dataTables_length,
-        .dark-mode .dataTables_wrapper .dataTables_filter,
-        .dark-mode .dataTables_wrapper .dataTables_info,
-        .dark-mode .dataTables_wrapper .dataTables_processing,
-        .dark-mode .dataTables_wrapper .dataTables_paginate {
-          color: #f8f9fa !important;
-        }
-        .dark-mode .dataTables_wrapper .dataTables_paginate .paginate_button {
-          color: #f8f9fa !important;
-        }
-        .dark-mode .dataTables_wrapper .dataTables_paginate .paginate_button.current,
-        .dark-mode .dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
-          color: #333 !important;
-        }
-        /* Consistent tab styling */
-        .nav-tabs .nav-link.active {
-          background-color: #007bff !important;
-          color: #ffffff !important;
-          border-color: #007bff !important;
-        }
+      :root {
+        --primary: #0d9488;
+        --primary-dark: #0f766e;
+        --primary-light: #ccfbf1;
+        --accent: #f59e0b;
+        --accent-dark: #b45309;
+        --navy-2: #1e293b;
+        --bg: #f1f5f9;
+        --surface: #ffffff;
+        --text: #1e293b;
+        --muted: #64748b;
+        --border: #e2e8f0;
+      }
 
-        .nav-tabs .nav-link {
-          color: #007bff !important;
-        }
+      body, .content-wrapper, .wrapper {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+      .content-wrapper {
+        background-color: var(--bg) !important;
+      }
+      h1, h2, h3, h4, h5, .card-title, .brand-text {
+        font-family: 'Inter', sans-serif;
+        font-weight: 700;
+        color: var(--text);
+      }
 
-        .nav-tabs .nav-link:hover:not(.active) {
-          border-color: #e9ecef #e9ecef #dee2e6;
-          color: #0056b3 !important;
-        }
+      /* Header / brand */
+      .main-header.navbar-teal { background-color: var(--primary) !important; border: none; box-shadow: 0 1px 4px rgba(15,23,42,.15); }
+      .main-header .nav-link { color: rgba(255,255,255,.9) !important; }
+      .brand-link.bg-teal { background-color: var(--primary-dark) !important; border-bottom: none !important; width: auto !important; white-space: nowrap; }
+      .brand-link .brand-text { color: #ffffff !important; font-weight: 700; overflow: visible !important; white-space: nowrap !important; }
 
-        /* Ensure sidebar consistency */
-        .nav-sidebar .nav-item .nav-link.active {
-          background-color: #007bff !important;
-          color: #ffffff !important;
-        }
+      /* Sidebar */
+      .main-sidebar.sidebar-light-teal {
+        background-color: #ffffff !important;
+        border-right: 1px solid var(--border);
+      }
+      .sidebar-steps { padding: 14px 16px 6px 16px; }
+      .sidebar-steps label {
+        color: var(--muted) !important;
+        font-weight: 600;
+        font-size: 12px;
+        letter-spacing: .2px;
+      }
+      .sidebar-steps .form-control, .sidebar-steps .selectize-input {
+        border: 1px solid var(--border) !important;
+        border-radius: 8px !important;
+      }
+      .sidebar-steps .form-control:focus, .sidebar-steps .selectize-input.focus {
+        border-color: var(--primary) !important;
+        box-shadow: 0 0 0 3px rgba(13,148,136,.15) !important;
+      }
+      .btn-cta {
+        display: block; width: 100%; margin-top: 14px; padding: 10px 12px;
+        background-color: var(--primary); border: none; border-radius: 8px;
+        color: #ffffff !important; font-weight: 600; font-size: 13px;
+      }
+      .btn-cta:hover, .btn-cta:focus { background-color: var(--primary-dark); color: #ffffff !important; }
+      .sidebar-hint {
+        margin-top: 10px; font-size: 11.5px; color: var(--muted);
+        line-height: 1.4;
+      }
+      .sidebar-hint svg { margin-right: 4px; }
 
-        .nav-sidebar .nav-item .nav-link {
-          color: #333333 !important;  /* Changed to black */
-        }
+      .nav-sidebar > .nav-item > .nav-link.active {
+        background-color: var(--primary-light) !important;
+        color: var(--primary-dark) !important;
+        border-radius: 6px;
+        font-weight: 600;
+      }
+      .nav-sidebar > .nav-item > .nav-link {
+        color: var(--text) !important;
+        border-radius: 6px;
+        margin: 2px 8px;
+        width: auto;
+      }
+      .nav-sidebar > .nav-item > .nav-link:hover:not(.active) {
+        background-color: #f1f5f9 !important;
+      }
 
-        .nav-sidebar .nav-item .nav-link:hover:not(.active) {
-          color: #007bff !important;
-        }
+      /* Cards / boxes */
+      .card { border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(15,23,42,.05); }
+      .card > .card-header { background: transparent; border-bottom: 1px solid var(--border); font-weight: 700; }
+      .card.card-teal { border-top: 3px solid var(--primary); }
+      .card.card-navy { border-top: 3px solid var(--navy-2); }
+      .card.card-pink { border-top: 3px solid #ec4899; }
+      .card.card-info { border-top: 3px solid #0ea5e9; }
 
-        /* Dark mode compatibility */
-        .dark-mode .nav-tabs .nav-link.active {
-          background-color: #375a7f !important;
-          color: #ffffff !important;
-          border-color: #375a7f !important;
-        }
+      /* Stepper */
+      .stepper { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-bottom: 20px; }
+      .step-item {
+        background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+        padding: 16px; box-shadow: 0 1px 2px rgba(15,23,42,.04);
+      }
+      .step-item .step-number {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 26px; height: 26px; border-radius: 50%;
+        background: var(--primary-light); color: var(--primary-dark);
+        font-weight: 700; font-size: 13px; margin-bottom: 8px;
+      }
+      .step-item h5 { margin: 4px 0 4px 0; font-size: 14.5px; color: var(--text); }
+      .step-item p { margin: 0; font-size: 12.5px; color: var(--muted); line-height: 1.4; }
 
-        .dark-mode .nav-tabs .nav-link {
-          color: #375a7f !important;
-        }
+      /* Callout */
+      .callout {
+        border-left: 4px solid var(--accent); background: #fffbeb; border-radius: 8px;
+        padding: 12px 16px; font-size: 13px; color: #78350f; margin-bottom: 20px;
+      }
 
-        .dark-mode .nav-sidebar .nav-item .nav-link.active {
-          background-color: #375a7f !important;
-          color: #ffffff !important;
-        }
+      /* Sorting boxes */
+      .data-source-badge {
+        display: inline-block; font-size: 12px; font-weight: 600; color: var(--primary-dark);
+        background: var(--primary-light); padding: 4px 10px; border-radius: 999px; margin-bottom: 10px;
+      }
+      .rank-list-container {
+        min-height: 130px; border: 2px dashed var(--border); border-radius: 10px;
+        padding: 10px; background: var(--surface);
+      }
+      .rank-list-container .rank-list-item {
+        color: var(--text);
+        background-color: #f8fafc;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 8px 12px;
+        margin-bottom: 6px;
+        font-weight: 500;
+      }
 
-        .dark-mode .nav-sidebar .nav-item .nav-link {
-          color: #f8f9fa !important;  /* Keep light color for dark mode */
-        }
+      /* Tabs */
+      .nav-tabs .nav-link.active {
+        background-color: var(--primary) !important;
+        color: #ffffff !important;
+        border-color: var(--primary) !important;
+      }
+      .nav-tabs .nav-link { color: var(--primary-dark) !important; }
+      .nav-tabs .nav-link:hover:not(.active) {
+        border-color: #e9ecef #e9ecef #dee2e6;
+        color: var(--primary-dark) !important;
+      }
+
+      /* Dark mode compatibility */
+      .dark-mode .content-wrapper { background-color: #1a2029 !important; }
+      .dark-mode .rank-list-container .rank-list-item {
+        color: #f8f9fa;
+        background-color: #343a40;
+      }
+      .dark-mode .main-sidebar {
+        background-color: #343a40 !important;
+      }
+      .dark-mode .main-sidebar .nav-sidebar .nav-item .nav-link,
+      .dark-mode .main-sidebar .nav-sidebar .nav-item .nav-link p,
+      .dark-mode .main-sidebar .brand-text,
+      .dark-mode .main-sidebar .user-panel .info,
+      .dark-mode .sidebar .form-group label,
+      .dark-mode .sidebar p,
+      .dark-mode .sidebar .btn-default,
+      .dark-mode .sidebar .form-control,
+      .dark-mode .sidebar .input-group-text,
+      .dark-mode .sidebar .selectize-input,
+      .dark-mode .sidebar .selectize-dropdown {
+        color: #f8f9fa !important;
+      }
+      .dark-mode .sidebar .form-control,
+      .dark-mode .sidebar .input-group-text,
+      .dark-mode .sidebar .selectize-input,
+      .dark-mode .sidebar .selectize-dropdown {
+        background-color: #454d55 !important;
+        border-color: #6c757d !important;
+      }
+      .dark-mode .sidebar .btn-default {
+        background-color: #454d55 !important;
+        border-color: #6c757d !important;
+      }
+      .dark-mode .sidebar .btn-default:hover {
+        background-color: #5a6268 !important;
+      }
+      .dark-mode .box-body {
+        color: #f8f9fa !important;
+      }
+      .dark-mode .dataTables_wrapper {
+        color: #f8f9fa !important;
+      }
+      .dark-mode .dataTables_wrapper .dataTables_length,
+      .dark-mode .dataTables_wrapper .dataTables_filter,
+      .dark-mode .dataTables_wrapper .dataTables_info,
+      .dark-mode .dataTables_wrapper .dataTables_processing,
+      .dark-mode .dataTables_wrapper .dataTables_paginate {
+        color: #f8f9fa !important;
+      }
+      .dark-mode .dataTables_wrapper .dataTables_paginate .paginate_button {
+        color: #f8f9fa !important;
+      }
+      .dark-mode .dataTables_wrapper .dataTables_paginate .paginate_button.current,
+      .dark-mode .dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
+        color: #333 !important;
+      }
+      .dark-mode .nav-tabs .nav-link.active {
+        background-color: var(--primary-dark) !important;
+        color: #ffffff !important;
+        border-color: var(--primary-dark) !important;
+      }
+      .dark-mode .nav-tabs .nav-link {
+        color: var(--primary-light) !important;
+      }
+      .dark-mode .nav-sidebar .nav-item .nav-link.active {
+        background-color: var(--primary-dark) !important;
+        color: #ffffff !important;
+      }
+      .dark-mode .nav-sidebar .nav-item .nav-link {
+        color: #f8f9fa !important;
+      }
       "))
     ),
     tabItems(
@@ -270,34 +391,45 @@ ui <- dashboardPage(
       ### Home content ----
       tabItem(
         tabName = "home",
-        
-        h1("Sugarcane Integrated Breeding System (SIBS) Sugarcane Crossing Tool (SCT)"),
-        p("Welcome to SCT! To use this app, follow the instructions below:"),
-        p("* Start by loggin in: from the sidebar on the left, (1) select a location and (2) breeder name."),
-        p("* Then, chose an (3) inventory date."),
-        p("* Next, (4) Click on the 'Get Flower Inventory' button"),
-        p("* After that, move to the Flowering Inventory tab to resort your inventory data"),
-        p("* You can then click on other tabs to explore related breeding data"),
+
+        h1(icon("seedling"), " Sugarcane Integrated Breeding System (SIBS) Sugarcane Crossing Tool (SCT)"),
+        p("Welcome to SCT! To use this app, follow the steps below:"),
+
+        div(class = "stepper",
+            lapply(seq_along(sct_workflow_steps), function(i) {
+              s <- sct_workflow_steps[[i]]
+              div(class = "step-item",
+                  div(class = "step-number", i),
+                  h5(icon(s$icon), " ", s$title),
+                  p(s$desc)
+              )
+            })
+        ),
+
+        div(class = "callout",
+            icon("circle-info"), " Don't forget to click ", strong("Get Flower Inventory"), " again each time you choose a new date."
+        ),
+
         p("Follow ", a(href="https://github.com/USDA-ARS-GBRU/SugarcaneCrossingTool", "this link"), " to the github repo for detailed instructions."),
-       
+
         card(
-          
+
         card_header("Login Information"),
-        
-        
+
+
         p("You've logged in to view inventory for this location: "),
-        
+
         span(textOutput("inventoryPointer"), style="color:blue"),
-        
+
         br(),
-        
+
         p("You've logged in as User:"),
-        
+
         span(textOutput("crossPointer"), style="color:blue")),
-        
+
         card(
           card_header("Inventory Information"),
-          
+
           p("You're viewing inventory for this day:"),
           span(textOutput("datePointer"), style="color:blue"))),
 
@@ -330,9 +462,12 @@ ui <- dashboardPage(
         #   
         fluidRow(
           box(
-            title = "Step 5: Sorting",
-            p("Drag and drop the available flowering clones into their appropriate category.", strong("Only"), "sorted clones will be displayed in subsequent tabs and/or used in cross prediction so this step must be done first."),
+            title = tagList(icon("layer-group"), "Step 5: Sorting"),
+            status = "teal",
+            solidHeader = FALSE,
             width = 12,
+            collapsible = FALSE,
+            p("Drag and drop the available flowering clones into their appropriate category.", strong("Only"), "sorted clones will be displayed in subsequent tabs and/or used in cross prediction so this step must be done first."),
             fluidRow(
               # column(
               #   width = 4,
@@ -340,14 +475,24 @@ ui <- dashboardPage(
               #   uiOutput("available_clones")
               # ),
               column(
-                width = 4,
-                h4("Female Parents"),
-                uiOutput("female_parents")
+                width = 6,
+                box(
+                  title = tagList(icon("venus"), "Female Parents"),
+                  status = "pink",
+                  width = 12,
+                  collapsible = FALSE,
+                  uiOutput("female_parents")
+                )
               ),
               column(
-                width = 4,
-                h4("Male Parents"),
-                uiOutput("male_parents")
+                width = 6,
+                box(
+                  title = tagList(icon("mars"), "Male Parents"),
+                  status = "info",
+                  width = 12,
+                  collapsible = FALSE,
+                  uiOutput("male_parents")
+                )
               )
             )
           )
@@ -356,19 +501,21 @@ ui <- dashboardPage(
         tabPanel(
           "Raw data",
         fluidRow(
-        box(title="Raw Data",
+        box(title=tagList(icon("table-list"), "Raw Data"),
+        status = "navy",
+        collapsible = FALSE,
         p("These tables shows you the", strong("raw data"), "for all parents flowering today, sorted into male and female columns based on techician's inventory"),
-             textOutput("dataSourceText"),
+             span(class = "data-source-badge", textOutput("dataSourceText", inline = TRUE)),
             width=12,
             fluidRow(
               column(
-                width=4,
-                h4("Female Parents"),
+                width=6,
+                h5(icon("venus"), " Female Parents"),
                 DTOutput("inventoryTableFemale")
               ),
             column(
-                width=4,
-                h4("Male Parents"),
+                width=6,
+                h5(icon("mars"), " Male Parents"),
                 DTOutput("inventoryTableMale")
               )
             )))
@@ -376,7 +523,7 @@ ui <- dashboardPage(
 
 
 
-        
+
          ))),
 
       ### Pedigree tab content ----
@@ -389,7 +536,8 @@ ui <- dashboardPage(
             "Pedigree Table",
             fluidRow(
               box(
-                title="Basic Pedigree Information",
+                title=tagList(icon("people-group"), "Basic Pedigree Information"),
+                status = "teal",
                 width=12,
                 actionButton(
                   inputId = "makepedigree",
@@ -403,7 +551,8 @@ ui <- dashboardPage(
           tabPanel(
             "Relationship Matrix",
             box(
-              title="Relationship Heatmap",
+              title=tagList(icon("chart-simple"), "Relationship Heatmap"),
+              status = "navy",
               width=12,
               p("This is a relationship matrix of the flowering clones. Values closer to one indicate high relatedness. You can zoom in to particular regions of the matrix.")),
             plotlyOutput("pedigreeMatrix")
@@ -412,7 +561,8 @@ ui <- dashboardPage(
             "Visualize Pedigrees",
             fluidRow(
               box(
-                title="Pedigree Trees",
+                title=tagList(icon("diagram-project"), "Pedigree Trees"),
+                status = "info",
                 p("You can select clones from the drop-down menu to see their pedigree. Note- future work will allow you to select how many generations you want to see"),
                 width=12,
                 uiOutput("cloneDropdown"),
@@ -432,6 +582,8 @@ ui <- dashboardPage(
             "Performance Table",
             fluidRow(
               box(
+                title=tagList(icon("star"), "Clone Performance"),
+                status = "teal",
                 width=12,
                 actionButton(
                   inputId = "makeperformance",
@@ -453,6 +605,8 @@ ui <- dashboardPage(
             "Trait Scatter Plot",
             fluidRow(
               box(
+                title=tagList(icon("chart-scatter"), "Trait Scatter Plot"),
+                status = "navy",
                 width=12,
                 uiOutput("scatterPlotDropdown_x"),
                 uiOutput("scatterPlotDropdown_y"),
@@ -472,7 +626,8 @@ ui <- dashboardPage(
             "Previous Crosses",
         fluidRow(
           box(
-            title="Previous crosses made with selected clones",
+            title=tagList(icon("xmark"), "Previous crosses made with selected clones"),
+            status = "teal",
             width=12,
             actionButton(
               inputId = "makecrosses",
@@ -488,7 +643,8 @@ ui <- dashboardPage(
         "Previous Reciprocal Crosses",
         fluidRow(
           box(
-            title="Previous RECIPROCAL crosses made with selected clones",
+            title=tagList(icon("xmark"), "Previous RECIPROCAL crosses made with selected clones"),
+            status = "navy",
             width=12,
             actionButton(
               inputId = "makerecipcrosses",
@@ -512,19 +668,22 @@ ui <- dashboardPage(
   tabName = "download",
   fluidRow(
     box(
-      title = "Download Full Data Report",
+      title = tagList(icon("download"), "Download Full Data Report"),
+      status = "teal",
       p("This button will allow you to download a full data report as an excel file.
         A partial download will fail, so make sure you've pulled all the inventory, pedigree, performance and cross data.
         A successful download will have a date in the file name."),
       downloadButton("downloaddata", "Download Full Data Report")
     ),
     box(
-      title = "Download Optimized Crossing Plan",
+      title = tagList(icon("download"), "Download Optimized Crossing Plan"),
+      status = "info",
       p("Click the button below to download the optimized crossing plan as an Excel file."),
       downloadButton("download_optimized_plan", "Download Optimized Crossing Plan")
     ),
     box(
-      title = "Download Cubicle Management Data",
+      title = tagList(icon("download"), "Download Cubicle Management Data"),
+      status = "navy",
       p("Click the button below to download the current cubicle assignments and notes as an Excel file."),
       downloadButton("download_cubicle_data", "Download Cubicle Data")
     )
@@ -537,7 +696,8 @@ ui <- dashboardPage(
         p("BETA implementation of", a(href="https://github.com/Resende-Lab/SimpleMating", "SimpleMating R package"), "This optimizes the midparent value of potential cross combinations based on a weighted selection index of parental BVs. Breeding values were predicted from S4 trial data and a pedigree relationship matrix. Potential crosses are culled based on pairwise-K value (where value of K is proportional to relatedness."),
         fluidRow(
           box(
-            title = "Optimization Parameters",
+            title = tagList(icon("sliders"), "Optimization Parameters"),
+            status = "teal",
             numericInput("n_crosses", "Number of Crosses to Select:", 10, min = 1, max = 100),
             numericInput("max_crosses_per_parent", "Max Crosses per Parent:", 3, min = 1, max = 10),
 
@@ -558,13 +718,15 @@ ui <- dashboardPage(
             actionButton("run_optimization", "Run Optimization")
           ),
           box(
-            title = "Optimized Crossing Plan",
+            title = tagList(icon("table-list"), "Optimized Crossing Plan"),
+            status = "navy",
             DTOutput("optimized_crosses_table")
           )
         ),
         fluidRow(
           box(
-            title = "Optimization Visualization",
+            title = tagList(icon("chart-scatter"), "Optimization Visualization"),
+            status = "info",
             plotlyOutput("optimization_plot")
           )
         )
@@ -573,7 +735,8 @@ ui <- dashboardPage(
         tabName = "cubicle",
         fluidRow(
           box(
-            title = "Cubicle Management",
+            title = tagList(icon("th"), "Cubicle Management"),
+            status = "teal",
             width = 12,
             p("Organize your optimized crosses into breeding cubicles. Each cubicle can contain up to 3 crosses with the same male parent."),
             actionButton("create_cubicle", "Create Cubicle from Selected Crosses", 
@@ -596,7 +759,8 @@ ui <- dashboardPage(
           column(
             width = 8,
             box(
-              title = "Current Cubicles",
+              title = tagList(icon("th"), "Current Cubicles"),
+              status = "teal",
               width = NULL,
               DTOutput("cubicle_table")
             )
@@ -604,12 +768,14 @@ ui <- dashboardPage(
           column(
             width = 4,
             box(
-              title = "Statistics",
+              title = tagList(icon("chart-simple"), "Statistics"),
+              status = "navy",
               width = NULL,
               verbatimTextOutput("statistics")
             ),
             box(
-              title = "Female to Male Ratios",
+              title = tagList(icon("venus-mars"), "Female to Male Ratios"),
+              status = "pink",
               width = NULL,
               uiOutput("cubicle_ratios")
             )
